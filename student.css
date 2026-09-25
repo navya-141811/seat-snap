@@ -16,7 +16,7 @@ body {
 
 .student-container {
     width: 100%;
-    max-width: 600px;
+    max-width: 750px;
 }
 
 .student-box {
@@ -195,4 +195,38 @@ body {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-10px); }
     75% { transform: translateX(10px); }
+}
+
+.classroom-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px 28px;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.bench-cell {
+    display: flex;
+    gap: 3px;
+    background: transparent;
+}
+
+.seat {
+    flex: 1;
+    height: 32px;
+    background: white;
+    border: 2px solid #11998e;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(17,153,142,0.15);
+    transition: transform 0.1s;
+}
+
+.seat-mine {
+    border-color: #e53e3e;
+    box-shadow: 0 0 8px rgba(229,62,62,0.4);
+    background: #fff5f5;
 }

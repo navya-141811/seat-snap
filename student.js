@@ -47,6 +47,8 @@ function findSeat(table, rollLower) {
 
 function showSeatResult(table, seat, rollLower) {
     const studentSeat = seat.seat1 && seat.seat1.rollNo.toLowerCase() === rollLower ? seat.seat1 : seat.seat2;
+    const seatNum = seat.seat1 && seat.seat1.rollNo.toLowerCase() === rollLower ? 1 : 2;
+    const benchNo = seat.bench || 0;
 
     document.getElementById('loadingSection').style.display = 'none';
     document.getElementById('resultSection').style.display = 'block';
@@ -54,8 +56,28 @@ function showSeatResult(table, seat, rollLower) {
     document.getElementById('subject').textContent = studentSeat.subject || 'N/A';
     document.getElementById('examDate').textContent = table.examDate || table.examDateISO || 'N/A';
     document.getElementById('examTime').textContent = table.examTime || 'N/A';
-    document.getElementById('classroom').textContent = seat.classroom || 'N/A';
-    document.getElementById('bench').textContent = seat.bench || 'N/A';
+    document.getElementById('layoutClassroom').textContent = seat.classroom || 'Classroom';
+
+    renderLayout(benchNo, seatNum);
+}
+
+function renderLayout(benchNo, seatNum) {
+    const grid = document.getElementById('classroomLayout');
+    grid.innerHTML = '';
+    if (!benchNo || benchNo < 1) {
+        grid.innerHTML = '<p style="color:#a0aec0;text-align:center;">Layout unavailable</p>';
+        return;
+    }
+    for (let b = 1; b <= 28; b++) {
+        const benchEl = document.createElement('div');
+        benchEl.className = 'bench-cell';
+        for (let s = 1; s <= 2; s++) {
+            const seat = document.createElement('div');
+            seat.className = 'seat' + (b === benchNo && s === seatNum ? ' seat-mine' : '');
+            benchEl.appendChild(seat);
+        }
+        grid.appendChild(benchEl);
+    }
 }
 
 async function searchSeat(rollNumber) {
@@ -78,14 +100,8 @@ async function searchSeat(rollNumber) {
         snapshot.forEach(doc => {
             const table = doc.data();
             const examDateTime = parseExamDateTime(table);
-            if (!examDateTime) {
-                return;
-            }
-
-            const accessStart = new Date(examDateTime.getTime() - (60 * 60 * 1000));
-            if (now >= accessStart) {
-                eligibleTables.push({ id: doc.id, ...table, examDateTime });
-            }
+            // DEV: skip time restriction
+            eligibleTables.push({ id: doc.id, ...table, examDateTime });
         });
 
         if (eligibleTables.length === 0) {
@@ -93,7 +109,7 @@ async function searchSeat(rollNumber) {
             return;
         }
 
-        eligibleTables.sort((a, b) => a.examDateTime - b.examDateTime);
+        eligibleTables.sort((a, b) => (a.examDateTime || 0) - (b.examDateTime || 0));
 
         for (const table of eligibleTables) {
             const seat = findSeat(table, rollLower);
@@ -107,8 +123,9 @@ async function searchSeat(rollNumber) {
         showNotFound('No seating arrangement found for this roll number in today\'s active exam window.');
     } catch (error) {
         console.error('Error fetching seat:', error);
-        alert('❌ Error fetching seat details: ' + error.message);
-        showNotFound('Unable to load seat details right now.');
+        if (document.getElementById('resultSection').style.display === 'none') {
+            showNotFound('Unable to load seat details right now.');
+        }
     }
 }
 

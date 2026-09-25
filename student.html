@@ -25,7 +25,7 @@
                     <h3 style="color: #1e40af; font-size: 24px; margin: 0;">Roll Number: <span id="rollNumber"></span></h3>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
                     <div class="result-card">
                         <h3>📋 Exam Details</h3>
                         <div class="result-info">
@@ -33,30 +33,19 @@
                                 <span class="label">Subject:</span>
                                 <span class="value" id="subject"></span>
                             </div>
-                            <div class="info-row">
+                            <div class="info-row" style="gap: 6px;">
                                 <span class="label">Date:</span>
                                 <span class="value" id="examDate"></span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">Time:</span>
+                                <span class="label" style="margin-left:16px;">Time:</span>
                                 <span class="value" id="examTime"></span>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="result-card">
-                        <h3>🪑 Seating Details</h3>
-                        <div class="result-info">
-                            <div class="info-row">
-                                <span class="label">Classroom:</span>
-                                <span class="value" id="classroom"></span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">Bench:</span>
-                                <span class="value" id="bench"></span>
-                            </div>
-                        </div>
-                    </div>
+                </div>
+
+                <div class="result-card" style="margin-top: 20px;">
+                    <h3>🗺️ <span id="layoutClassroom"></span></h3>
+                    <div id="classroomLayout" class="classroom-grid"></div>
                 </div>
             </div>
             
