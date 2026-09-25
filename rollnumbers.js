@@ -1,143 +1,244 @@
-// Roll Numbers Data for All Years and Sections
-const ROLL_NUMBERS = {
-  // 1st Year (2025 batch)
-  "1st Year CSE A": generateRange("25wh1a0501", "25wh1a0564"),
-  "1st Year CSE B": [...generateRange("25wh1a0565", "25wh1a0599").slice(0, 35), ...generateAlphaRange("25wh1a05a0", "25wh1a05c8")],
-  "1st Year CSE C": generateAlphaRange("25wh1a05c9", "25wh1a05k3", ['i']),
-  "1st Year CSE D": generateAlphaRange("25wh1a05k4", "25wh1a05r7", ['i', 'o']),
-  "1st Year CSE E": generateAlphaRange("25wh1a05r8", "25wh1a05z1", ['i', 'o', 's']),
-  "1st Year CSE F": [...generateAlphaRange("25wh1a05z2", "25wh1a05z9", ['i', 'o', 's']), ...generateDoubleAlphaRange("25wh1a05aa", "25wh1a05cj", ['i', 'o', 's'], true)],
-  "1st Year AIML A": generateRange("25wh1a6601", "25wh1a6664"),
-  "1st Year AIML B": [...generateRange("25wh1a6665", "25wh1a6699"), ...generateAlphaRange("25wh1a66a0", "25wh1a66c8")],
-  "1st Year ECE A": generateRange("25wh1a5501", "25wh1a5564"),
-  "1st Year ECE B": [...generateRange("25wh1a5565", "25wh1a5599"), ...generateAlphaRange("25wh1a55a0", "25wh1a55c8")],
-  "1st Year EEE": generateRange("25wh1a4401", "25wh1a4464"),
+/**
+ * SeatSnap - Student Data Management Module
+ * Replaces legacy hardcoded datasets with dynamic, persistent data stores.
+ * All previous hardcoded student roll numbers have been purged.
+ */
 
-  // 2nd Year (2024 batch)
-  "2nd Year CSE A": [...generateRange("24wh1a0501", "24wh1a0564"), ...generateRange("25wh5a0501", "25wh5a0507")],
-  "2nd Year CSE B": [...generateRange("24wh1a0565", "24wh1a0599"), ...generateAlphaRange("24wh1a05a0", "24wh1a05c8"), ...generateRange("25wh5a0508", "25wh5a0514")],
-  "2nd Year CSE C": [...generateAlphaRange("24wh1a05c9", "24wh1a05k2"), ...generateRange("25wh5a0515", "25wh5a0521")],
-  "2nd Year CSE D": [...generateAlphaRange("24wh1a05k3", "24wh1a05r6"), ...generateRange("25wh5a0522", "25wh5a0528")],
-  "2nd Year CSE E": [...generateAlphaRange("24wh1a05r7", "24wh1a05z0"), ...generateRange("25wh5a0529", "25wh5a0535")],
-  "2nd Year CSE F": [...generateDoubleAlphaRange("24wh1a05aa", "24wh1a05ch", ['i', 'o', 's']), ...generateAlphaRange("24wh1a05z1", "24wh1a05z9"), ...generateRange("25wh5a0536", "25wh5a0541")],
-  "2nd Year AIML A": generateRange("24wh1a6601", "24wh1a6664"),
-  "2nd Year AIML B": [...generateRange("24wh1a6665", "24wh1a6699"), ...generateAlphaRange("24wh1a66a0", "24wh1a66c8")],
-  "2nd Year ECE A": generateRange("24wh1a5501", "24wh1a5564"),
-  "2nd Year ECE B": [...generateRange("24wh1a5565", "24wh1a5599"), ...generateAlphaRange("24wh1a55a0", "24wh1a55c8")],
-  "2nd Year EEE": generateRange("24wh1a4401", "24wh1a4464"),
-
-  // 3rd Year (2023 batch)
-  "3rd Year CSE A": [...generateRange("23wh1a0501", "23wh1a0564"), ...generateRange("24wh5a0501", "24wh5a0506")],
-  "3rd Year CSE B": [...generateRange("23wh1a0565", "23wh1a0599"), ...generateAlphaRange("23wh1a05a0", "23wh1a05c8", [], ["b4"]), ...generateRange("24wh5a0507", "24wh5a0512")],
-  "3rd Year CSE C": [...generateAlphaRange("23wh1a05c9", "23wh1a05j1"), ...generateRange("24wh5a0513", "24wh5a0519")],
-  "3rd Year AIML A": generateRange("23wh1a6601", "23wh1a6664"),
-  "3rd Year AIML B": [...generateRange("23wh1a6665", "23wh1a6699"), ...generateAlphaRange("23wh1a66a0", "23wh1a66c8")],
-  "3rd Year ECE A": generateRange("23wh1a5501", "23wh1a5564"),
-  "3rd Year ECE B": [...generateRange("23wh1a5565", "23wh1a5599"), ...generateAlphaRange("23wh1a55a0", "23wh1a55c8")],
-  "3rd Year EEE": generateRange("23wh1a4401", "23wh1a4464"),
-
-  // 4th Year (2022 batch)
-  "4th Year CSE A": [...generateRange("22wh1a0501", "22wh1a0565"), ...generateRange("23wh5a0501", "23wh5a0506")],
-  "4th Year CSE B": [...generateRange("22wh1a0566", "22wh1a0599"), ...generateAlphaRange("22wh1a05a0", "22wh1a05c9", [], ["76", "c5"]), ...generateRange("23wh5a0507", "23wh5a0512")],
-  "4th Year CSE C": [...generateAlphaRange("22wh1a05d0", "22wh1a05j3"), "24wh8a0501", ...generateRange("23wh5a0513", "23wh5a0519")],
-  "4th Year AIML A": generateRange("22wh1a6601", "22wh1a6664"),
-  "4th Year AIML B": [...generateRange("22wh1a6665", "22wh1a6699"), ...generateAlphaRange("22wh1a66a0", "22wh1a66c8")],
-  "4th Year ECE A": generateRange("22wh1a5501", "22wh1a5564"),
-  "4th Year ECE B": [...generateRange("22wh1a5565", "22wh1a5599"), ...generateAlphaRange("22wh1a55a0", "22wh1a55c8")],
-  "4th Year EEE": generateRange("22wh1a4401", "22wh1a4464")
+// Storage keys
+const STORAGE_KEYS = {
+    STUDENT_DATA: 'seatsnap_student_data',
+    ACADEMIC_YEARS: 'seatsnap_academic_years',
+    CLASSROOM_ASSIGNMENTS: 'seatsnap_classroom_assignments',
+    LEGACY_SEATING: 'seatingData',
+    LEGACY_OVERFLOW: 'overflowData'
 };
 
-function generateRange(start, end) {
-  const rolls = [];
-  const prefix = start.slice(0, -2);
-  const startNum = parseInt(start.slice(-2));
-  const endNum = parseInt(end.slice(-2));
-  for (let i = startNum; i <= endNum; i++) {
-    rolls.push(prefix + i.toString().padStart(2, '0'));
-  }
-  return rolls;
-}
+// Global in-memory dynamic registry
+let SeatSnapStudentStore = {
+    "1st Year": [],
+    "2nd Year": [],
+    "3rd Year": [],
+    "4th Year": []
+};
 
-function generateAlphaRange(start, end, skip = [], exclude = []) {
-  const rolls = [];
-  const prefix = start.slice(0, -2);
-  const startChar = start.slice(-2, -1);
-  const startNum = parseInt(start.slice(-1));
-  const endChar = end.slice(-2, -1);
-  const endNum = parseInt(end.slice(-1));
-  
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('').filter(c => !skip.includes(c));
-  const startIdx = alphabet.indexOf(startChar);
-  const endIdx = alphabet.indexOf(endChar);
-  
-  for (let i = startIdx; i <= endIdx; i++) {
-    const letter = alphabet[i];
-    const start = (i === startIdx) ? startNum : 0;
-    const end = (i === endIdx) ? endNum : 9;
-    for (let j = start; j <= end; j++) {
-      const rollNum = prefix + letter + j;
-      if (!exclude.includes(letter + j)) {
-        rolls.push(rollNum);
-      }
+// Dynamic ROLL_NUMBERS proxy/object for backward compatibility with existing generator
+const ROLL_NUMBERS = (typeof window !== 'undefined' && window.ROLL_NUMBERS) ? window.ROLL_NUMBERS : {};
+
+/**
+ * Purge all previous student data and legacy seating arrangements from system storage
+ */
+function clearPreviousSystemData() {
+    console.log('🧹 Purging previous student data and legacy storage...');
+    try {
+        localStorage.removeItem(STORAGE_KEYS.STUDENT_DATA);
+        localStorage.removeItem('seatsnap_data_meta');
+        localStorage.removeItem(STORAGE_KEYS.ACADEMIC_YEARS);
+        localStorage.removeItem(STORAGE_KEYS.CLASSROOM_ASSIGNMENTS);
+        localStorage.removeItem(STORAGE_KEYS.LEGACY_SEATING);
+        localStorage.removeItem(STORAGE_KEYS.LEGACY_OVERFLOW);
+        
+        // Reset in-memory store
+        SeatSnapStudentStore = {
+            "1st Year": [],
+            "2nd Year": [],
+            "3rd Year": [],
+            "4th Year": []
+        };
+        
+        // Reset ROLL_NUMBERS
+        Object.keys(ROLL_NUMBERS).forEach(key => delete ROLL_NUMBERS[key]);
+        
+        if (typeof window !== 'undefined' && window.StudentDataContext) {
+            window.StudentDataContext.clearAllData();
+        }
+
+        console.log('✅ Previous student data cleared successfully.');
+        return { success: true, message: 'All previous data cleared.' };
+    } catch (e) {
+        console.error('Error clearing data:', e);
+        return { success: false, error: e.message };
     }
-  }
-  return rolls;
 }
 
-function generateDoubleAlphaRange(start, end, skip = [], includeCi = false) {
-  const rolls = [];
-  const prefix = start.slice(0, -2);
-  const startChars = start.slice(-2);
-  const endChars = end.slice(-2);
-  
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('').filter(c => !skip.includes(c));
-  
-  const startIdx1 = alphabet.indexOf(startChars[0]);
-  const startIdx2 = alphabet.indexOf(startChars[1]);
-  const endIdx1 = alphabet.indexOf(endChars[0]);
-  const endIdx2 = alphabet.indexOf(endChars[1]);
-  
-  for (let i = startIdx1; i <= endIdx1; i++) {
-    const letter1 = alphabet[i];
-    const start2 = (i === startIdx1) ? startIdx2 : 0;
-    const end2 = (i === endIdx1) ? endIdx2 : alphabet.length - 1;
+/**
+ * Load student data from localStorage or StudentDataContext into memory
+ */
+function loadSystemStudentData() {
+    try {
+        if (typeof window !== 'undefined' && window.StudentDataContext) {
+            SeatSnapStudentStore = window.StudentDataContext.getState().students;
+            syncRollNumbersProxy();
+            return SeatSnapStudentStore;
+        }
+
+        const stored = localStorage.getItem(STORAGE_KEYS.STUDENT_DATA);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            SeatSnapStudentStore = {
+                "1st Year": parsed["1st Year"] || [],
+                "2nd Year": parsed["2nd Year"] || [],
+                "3rd Year": parsed["3rd Year"] || [],
+                "4th Year": parsed["4th Year"] || []
+            };
+            syncRollNumbersProxy();
+            return SeatSnapStudentStore;
+        }
+    } catch (e) {
+        console.error('Error loading stored student data:', e);
+    }
+    return SeatSnapStudentStore;
+}
+
+/**
+ * Save new student data into system storage
+ */
+function saveSystemStudentData(data) {
+    try {
+        SeatSnapStudentStore = {
+            "1st Year": data["1st Year"] || [],
+            "2nd Year": data["2nd Year"] || [],
+            "3rd Year": data["3rd Year"] || [],
+            "4th Year": data["4th Year"] || []
+        };
+        localStorage.setItem(STORAGE_KEYS.STUDENT_DATA, JSON.stringify(SeatSnapStudentStore));
+        syncRollNumbersProxy();
+
+        if (typeof window !== 'undefined' && window.StudentDataContext) {
+            window.StudentDataContext.setParsedData(SeatSnapStudentStore);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error('Error saving student data:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+/**
+ * Sync the ROLL_NUMBERS map used by legacy seating modules
+ */
+function syncRollNumbersProxy() {
+    Object.keys(ROLL_NUMBERS).forEach(key => delete ROLL_NUMBERS[key]);
     
-    for (let j = start2; j <= end2; j++) {
-      const letter2 = alphabet[j];
-      const combo = letter1 + letter2;
-      // Special case: include 'ci' for CSE F
-      if (includeCi && combo === 'ci') {
-        rolls.push(prefix + combo);
-      } else if (combo !== 'ci') {
-        rolls.push(prefix + combo);
-      }
-    }
-  }
-  return rolls;
+    Object.entries(SeatSnapStudentStore).forEach(([year, students]) => {
+        students.forEach(student => {
+            const sectionKey = `${year} ${student.department || 'CSE'} ${student.section || 'A'}`;
+            if (!ROLL_NUMBERS[sectionKey]) {
+                ROLL_NUMBERS[sectionKey] = [];
+            }
+            if (!ROLL_NUMBERS[sectionKey].includes(student.rollNumber)) {
+                ROLL_NUMBERS[sectionKey].push(student.rollNumber);
+            }
+        });
+    });
 }
 
-// Get all roll numbers as flat array
+/**
+ * Get student list for a given academic year
+ */
+function getStudentsForYear(yearName) {
+    return SeatSnapStudentStore[yearName] || [];
+}
+
+/**
+ * Classroom partitioning helper (Capacity: 7 x 4 = 28 seats)
+ */
+function partitionClassroomsForYear(yearName, capacity = 28) {
+    const students = getStudentsForYear(yearName);
+    const classrooms = [];
+    
+    if (!students || students.length === 0) {
+        return classrooms;
+    }
+    
+    const totalStudents = students.length;
+    let roomIndex = 1;
+    
+    for (let i = 0; i < totalStudents; i += capacity) {
+        const slice = students.slice(i, i + capacity);
+        classrooms.push({
+            roomId: `CR-${100 + roomIndex}`,
+            roomName: `Classroom ${100 + roomIndex}`,
+            capacity: capacity,
+            studentsCount: slice.length,
+            students: slice,
+            isExtraRoom: false,
+            rollRange: {
+                start: slice[0]?.rollNumber || '',
+                end: slice[slice.length - 1]?.rollNumber || ''
+            }
+        });
+        roomIndex++;
+    }
+    
+    return classrooms;
+}
+
+// Backward compatibility helper methods
 function getAllRollNumbers() {
-  return Object.values(ROLL_NUMBERS).flat();
+    return Object.values(ROLL_NUMBERS).flat();
 }
 
-// Get roll numbers by section
 function getRollNumbersBySection(section) {
-  return ROLL_NUMBERS[section] || [];
+    return ROLL_NUMBERS[section] || [];
 }
 
-// Search for a roll number
 function findStudentSection(rollNumber) {
-  const roll = rollNumber.toLowerCase();
-  for (const [section, rolls] of Object.entries(ROLL_NUMBERS)) {
-    if (rolls.some(r => r.toLowerCase() === roll)) {
-      return section;
+    const roll = rollNumber.toLowerCase();
+    for (const [section, rolls] of Object.entries(ROLL_NUMBERS)) {
+        if (rolls.some(r => r.toLowerCase() === roll)) {
+            return section;
+        }
     }
-  }
-  return null;
+    return null;
 }
 
-// Export for use in other files
+// Initialize: if StudentDataContext is already loaded (script order), sync from it.
+// Otherwise fall back to localStorage load / legacy purge.
+(function init() {
+    if (typeof window !== 'undefined' && window.StudentDataContext) {
+        // StudentDataContext already managed the load; just sync ROLL_NUMBERS proxy
+        const ctxStudents = window.StudentDataContext.getState().students;
+        SeatSnapStudentStore = ctxStudents;
+        syncRollNumbersProxy();
+        return;
+    }
+    const isCleaned = sessionStorage.getItem('seatsnap_legacy_purged');
+    if (!isCleaned) {
+        clearPreviousSystemData();
+        sessionStorage.setItem('seatsnap_legacy_purged', 'true');
+    } else {
+        loadSystemStudentData();
+    }
+})();
+
+// Export globally and for Node.js environments
+if (typeof window !== 'undefined') {
+    window.SeatSnapStore = {
+        clearPreviousSystemData,
+        loadSystemStudentData,
+        saveSystemStudentData,
+        getStudentsForYear,
+        partitionClassroomsForYear,
+        getStore: () => SeatSnapStudentStore
+    };
+    window.ROLL_NUMBERS = ROLL_NUMBERS;
+    window.clearPreviousSystemData = clearPreviousSystemData;
+    window.getAllRollNumbers = getAllRollNumbers;
+    window.getRollNumbersBySection = getRollNumbersBySection;
+    window.findStudentSection = findStudentSection;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ROLL_NUMBERS, getAllRollNumbers, getRollNumbersBySection, findStudentSection };
+    module.exports = {
+        ROLL_NUMBERS,
+        clearPreviousSystemData,
+        loadSystemStudentData,
+        saveSystemStudentData,
+        getStudentsForYear,
+        partitionClassroomsForYear,
+        getAllRollNumbers,
+        getRollNumbersBySection,
+        findStudentSection
+    };
 }

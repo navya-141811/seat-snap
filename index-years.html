@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seat Snap - Admin Panel</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -40,62 +41,84 @@
 </head>
 <body>
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #f0f0f0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 3px solid #f0f0f0;">
             <div>
                 <h1 style="margin-bottom: 5px; font-size: 2.5em;">🎓 Seat Snap</h1>
-                <p style="color: #718096; font-size: 14px; margin: 0;">Exam Seat Arrangement System</p>
+                <p style="color: #718096; font-size: 14px; margin: 0;">Exam Seat Arrangement System - Admin Dashboard</p>
             </div>
             <button onclick="logout()" style="background: linear-gradient(135deg, #f56565 0%, #c53030 100%); padding: 12px 24px; font-size: 14px; border: none; color: white;">🚪 Logout</button>
         </div>
-        
-        <div class="input-section">
-            <div class="form-group">
-                <label>📅 Select Semester:</label>
-                <div style="display: flex; gap: 20px; margin: 15px 0; padding: 20px; background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-radius: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 600;">
-                        <input type="radio" name="semester" value="I" onchange="selectCommonSemester('I')" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
-                        <span>Semester I</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 600;">
-                        <input type="radio" name="semester" value="II" onchange="selectCommonSemester('II')" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
-                        <span>Semester II</span>
-                    </label>
+
+        <!-- Navigation Tabs -->
+        <div class="dashboard-nav-tabs">
+            <button type="button" class="dashboard-tab-btn active" id="tabStudentData">
+                📊 Student Data & Classrooms (Ingestion View)
+            </button>
+            <button type="button" class="dashboard-tab-btn" id="tabArrangementGen">
+                ⚡ Seating Plan Generator
+            </button>
+        </div>
+
+        <!-- Section 1: Member 1 Data Ingestion & Dashboard View -->
+        <div id="sectionStudentData">
+            <!-- Member 1 Task 1 & 2: Excel File Upload Area -->
+            <div id="excelUploadContainer"></div>
+
+            <!-- Member 1 Task 2: Academic Year Cards & Classroom Grid -->
+            <div id="yearDashboardContainer"></div>
+        </div>
+
+        <!-- Section 2: Exam Seating Plan Generator -->
+        <div id="sectionArrangementGen" style="display: none;">
+            <div class="input-section">
+                <div class="form-group">
+                    <label>📅 Select Semester:</label>
+                    <div style="display: flex; gap: 20px; margin: 15px 0; padding: 20px; background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-radius: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 600;">
+                            <input type="radio" name="semester" value="I" onchange="selectCommonSemester('I')" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+                            <span>Semester I</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 600;">
+                            <input type="radio" name="semester" value="II" onchange="selectCommonSemester('II')" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+                            <span>Semester II</span>
+                        </label>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="form-group" id="yearSelectionSection" style="display: none;">
-                <label>📚 Select Year:</label>
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <button type="button" class="year-btn" data-year="1" onclick="selectYear(1)">1st Year</button>
-                    <button type="button" class="year-btn" data-year="2" onclick="selectYear(2)">2nd Year</button>
-                    <button type="button" class="year-btn" data-year="3" onclick="selectYear(3)">3rd Year</button>
-                    <button type="button" class="year-btn" data-year="4" onclick="selectYear(4)">4th Year</button>
+                
+                <div class="form-group" id="yearSelectionSection" style="display: none;">
+                    <label>📚 Select Year:</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button type="button" class="year-btn" data-year="1" onclick="selectYear(1)">1st Year</button>
+                        <button type="button" class="year-btn" data-year="2" onclick="selectYear(2)">2nd Year</button>
+                        <button type="button" class="year-btn" data-year="3" onclick="selectYear(3)">3rd Year</button>
+                        <button type="button" class="year-btn" data-year="4" onclick="selectYear(4)">4th Year</button>
+                    </div>
                 </div>
-            </div>
-            
-            <div id="yearBranchSelection"></div>
-            
-            <div class="form-group" id="examDetailsSection" style="display: none;">
-                <label>📅 Exam Date:</label>
-                <input type="date" id="examDate" required style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
-            </div>
-            
-            <div class="form-group" id="examTimeSection" style="display: none;">
-                <label>🕐 Exam Time:</label>
-                <input type="time" id="examTime" required style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
-            </div>
-            
-            <div id="roomRequirementSection" style="display: none; margin-top: 20px;">
-                <div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 20px; border-radius: 10px; border: 2px solid #667eea;">
-                    <h3 style="margin-top: 0; color: #667eea; font-size: 18px;">🏫 Room Assignment</h3>
-                    <p id="roomRequirementText" style="font-size: 16px; font-weight: 600; color: #4a5568;"></p>
-                    
-                    <div id="roomAssignmentDisplay"></div>
+                
+                <div id="yearBranchSelection"></div>
+                
+                <div class="form-group" id="examDetailsSection" style="display: none;">
+                    <label>📅 Exam Date:</label>
+                    <input type="date" id="examDate" required style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
                 </div>
-            </div>
-            
-            <div id="generateSection" style="text-align: center; margin-top: 30px; display: none;">
-                <button onclick="generateArrangement()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 40px; font-size: 18px; border: none; color: white; font-weight: 600;">✨ Generate Arrangement</button>
+                
+                <div class="form-group" id="examTimeSection" style="display: none;">
+                    <label>🕐 Exam Time:</label>
+                    <input type="time" id="examTime" required style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px;">
+                </div>
+                
+                <div id="roomRequirementSection" style="display: none; margin-top: 20px;">
+                    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 20px; border-radius: 10px; border: 2px solid #667eea;">
+                        <h3 style="margin-top: 0; color: #667eea; font-size: 18px;">🏫 Room Assignment</h3>
+                        <p id="roomRequirementText" style="font-size: 16px; font-weight: 600; color: #4a5568;"></p>
+                        
+                        <div id="roomAssignmentDisplay"></div>
+                    </div>
+                </div>
+                
+                <div id="generateSection" style="text-align: center; margin-top: 30px; display: none;">
+                    <button onclick="generateArrangement()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 40px; font-size: 18px; border: none; color: white; font-weight: 600;">✨ Generate Arrangement</button>
+                </div>
             </div>
         </div>
     </div>
@@ -110,11 +133,20 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config-simple.js"></script>
-    <script src="rollnumbers.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Member 1 Modular Core -->
+    <script src="src/types/seatSnap.js"></script>
+    <script src="src/services/excelParser.js"></script>
+    <script src="src/context/StudentDataContext.js"></script>
+    <script src="src/components/admin/ExcelUpload.js"></script>
+    <script src="src/components/admin/YearDashboard.js"></script>
+    <script src="rollnumbers.js"></script>
+    <script src="admin-dashboard.js"></script>
     <script src="app-years.js"></script>
+    
     <script>
         if (!sessionStorage.getItem('isLoggedIn') || sessionStorage.getItem('userRole') !== 'admin') {
             window.location.href = 'index.html';
