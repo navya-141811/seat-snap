@@ -827,7 +827,9 @@ function generateMultiYearArrangement() {
     const examDate = document.getElementById('examDate').value;
     const examTime = document.getElementById('examTime').value;
     const { allStudents, branchSelections } = buildStudentAndSectionData();
-    const result = allocateSeatsToClassrooms(allStudents);
+    const firstYear = Array.from(selectedYears)[0];
+    const examType = yearData[firstYear]?.mid || '';
+    const result = allocateSeatsToClassrooms(allStudents, examType);
 
     // Shuffle room assignments (same as shuffle button) so rooms differ every generation
     const sections = result.sections;
@@ -866,26 +868,64 @@ function generateMultiYearArrangement() {
     window.location.href = 'results.html';
 }
 
-function allocateStudentsToBenches(students) {
-    const remaining = [...students];
-    const benches = [];
+function allocateStudentsToBenches(students, examType = '') {
+    const isSem = examType === 'Sem';
     const normalize = value => String(value || '').trim().toLowerCase();
+    const studentsBySubject = {};
 
-    while (remaining.length) {
-        const student = remaining.shift();
-        const partnerIndex = remaining.findIndex(candidate =>
-            normalize(candidate.subject) !== normalize(student.subject)
-        );
-        const partner = partnerIndex >= 0 ? remaining.splice(partnerIndex, 1)[0] : null;
-        benches.push({ seat1: student, seat2: partner });
+    students.forEach(student => {
+        const key = normalize(student.subject);
+        if (!studentsBySubject[key]) studentsBySubject[key] = [];
+        studentsBySubject[key].push(student);
+    });
+
+    const subjects = Object.keys(studentsBySubject);
+    const seatedRollNumbers = new Set();
+    const benches = [];
+    let benchCount = 0;
+    let keepGoing = true;
+
+    while (keepGoing) {
+        keepGoing = false;
+        for (let i = 0; i < subjects.length; i++) {
+            for (let j = i + 1; j < subjects.length; j++) {
+                const list1 = studentsBySubject[subjects[i]];
+                const list2 = studentsBySubject[subjects[j]];
+                if (!list1.length || !list2.length) continue;
+
+                const student1 = list1.shift();
+                const student2 = list2.shift();
+
+                if (student1.section === student2.section) {
+                    list1.unshift(student1);
+                    list2.unshift(student2);
+                    continue;
+                }
+
+                const swap = isSem && (benchCount % 2 === 1);
+                benches.push({ seat1: swap ? student2 : student1, seat2: swap ? student1 : student2 });
+                seatedRollNumbers.add(student1.rollNo);
+                seatedRollNumbers.add(student2.rollNo);
+                benchCount++;
+                keepGoing = true;
+            }
+        }
     }
+
+    // Seat remaining unpaired students
+    students.forEach(student => {
+        if (!seatedRollNumbers.has(student.rollNo)) {
+            benches.push({ seat1: student, seat2: null });
+            seatedRollNumbers.add(student.rollNo);
+        }
+    });
 
     return benches;
 }
 
-function allocateSeatsToClassrooms(students) {
+function allocateSeatsToClassrooms(students, examType = '') {
     const BENCHES_PER_CLASSROOM = 28;
-    const allBenches = allocateStudentsToBenches(students);
+    const allBenches = allocateStudentsToBenches(students, examType);
     const rooms = Array.from(selectedRooms);
 
     // Distribute benches into rooms (28 per room)
