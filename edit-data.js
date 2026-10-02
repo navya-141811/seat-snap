@@ -345,7 +345,6 @@ function processEditFile(file) {
                 const rows = parseCSV(e.target.result);
                 processRows(rows, file.name);
             } else {
-                // Use sheet-aware workbook processing for xlsx/xls
                 const workbook = XLSX.read(e.target.result, { type: 'array' });
                 processWorkbook(workbook, file.name);
             }
@@ -369,27 +368,11 @@ function parseCSV(text) {
 }
 
 // ─── Row Processing ───────────────────────────────────────────────────────────
-/**
- * This file uses a sheet-per-section format:
- *   - Each sheet is named like "EEE", "ECE A", "CSE B", "CSE(AI&ML) A"
- *   - Rows 0-3: college header (skip)
- *   - Row 4: "Branch: EEE" or "Branch: CSE A" (used as fallback)
- *   - Row 5: column headers (S.No, Hall Ticket No, Name, <blank>, S.No, Hall Ticket No, Name)
- *   - Row 6+: dual-column student data
- *     Left:  col[0]=sno, col[1]=rollNo, col[2]=name
- *     Right: col[4]=sno, col[5]=rollNo, col[6]=name
- *
- * We process all sheets from the workbook.
- * Year is detected from title rows (e.g. "II B.TECH." → 2nd Year)
- */
 function processRows(rows, filename) {
-    // This function is called per-sheet; we override it with processWorkbook for xlsx/xls
-    // For CSV fallback (single sheet, no sheet names), use legacy column detection
     if (!rows || rows.length < 2) {
         setEditStatus('❌ File appears to be empty or has no data rows.', 'red');
         return;
     }
-    // Try legacy column-based parsing as fallback for CSV
     const header = rows[0].map(h => String(h).trim().toLowerCase());
     const colIdx = detectColumns(header);
     const parsed = [];
@@ -415,10 +398,6 @@ function processRows(rows, filename) {
     renderYearSelection();
 }
 
-/**
- * Process an entire workbook (xlsx/xls) where each sheet = one branch+section.
- * Sheet names like: "EEE", "ECE A", "ECE B", "CSE A"..."CSE F", "CSE(AI&ML) A", "CSE(AI&ML) B"
- */
 function processWorkbook(workbook, filename) {
     const allStudents = [];
 
@@ -426,21 +405,13 @@ function processWorkbook(workbook, filename) {
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
         if (!rows || rows.length < 6) return;
 
-        // Year labels may be merged into any header cell, so inspect all header cells.
         const year = detectWorkbookYear(rows);
-
-        // Parse branch and section from sheet name
-        // e.g. "EEE" → branch=EEE, section=A
-        // e.g. "ECE A" → branch=ECE, section=A
-        // e.g. "CSE(AI&ML) B" → branch=AIML, section=B
         const { branch, section } = parseSheetName(sheetName);
 
-        // Data rows start at row 6 (0-indexed), row 5 is the header
         for (let r = 6; r < rows.length; r++) {
             const row = rows[r];
             if (!row || row.every(c => String(c).trim() === '')) continue;
 
-            // Left column: col[0]=sno, col[1]=roll, col[2]=name
             const leftRoll = String(row[1] || '').trim();
             const leftName = String(row[2] || '').trim();
             if (leftRoll && /wh/i.test(leftRoll)) {
@@ -452,7 +423,6 @@ function processWorkbook(workbook, filename) {
                 });
             }
 
-            // Right column: col[4]=sno, col[5]=roll, col[6]=name
             const rightRoll = String(row[5] || '').trim();
             const rightName = String(row[6] || '').trim();
             if (rightRoll && /wh/i.test(rightRoll)) {
@@ -492,14 +462,6 @@ function detectWorkbookYear(rows) {
     return match ? match[1] : '';
 }
 
-/**
- * Parse branch and section from a sheet name.
- * "EEE"            → { branch: 'EEE', section: 'A' }
- * "ECE A"          → { branch: 'ECE', section: 'A' }
- * "CSE B"          → { branch: 'CSE', section: 'B' }
- * "CSE(AI&ML) A"   → { branch: 'AIML', section: 'A' }
- * "CSE(AI&ML) B"   → { branch: 'AIML', section: 'B' }
- */
 function parseSheetName(name) {
     const s = name.trim().toUpperCase();
     let branch = '';
@@ -521,7 +483,6 @@ function parseSheetName(name) {
         branch = s.split(' ')[0];
     }
 
-    // Extract section letter from the end: "ECE A" → A, "CSE F" → F
     const secMatch = s.match(/\b([A-Z])\s*$/);
     if (secMatch) {
         section = secMatch[1];
@@ -561,7 +522,6 @@ function resolveYearBranchSection(yearRaw, branchRaw, sectionRaw, rollNo) {
     let branch = normalizeBranch(branchRaw);
     let section = sectionRaw.toUpperCase() || '';
 
-    // If section column contains combined info like "2nd Year CSE A"
     if (!branch && sectionRaw) {
         const combined = parseCombinedSection(sectionRaw);
         if (combined.year) year = combined.year;
@@ -569,7 +529,6 @@ function resolveYearBranchSection(yearRaw, branchRaw, sectionRaw, rollNo) {
         if (combined.section) section = combined.section;
     }
 
-    // Fallback: guess from roll number prefix (e.g. 24wh1a05xx → CSE 2nd year)
     if (!branch) branch = guessBranchFromRoll(rollNo);
     if (!year) year = guessYearFromRoll(rollNo);
 
@@ -611,12 +570,6 @@ function normalizeBranch(raw) {
 
 function guessBranchFromRoll(roll) {
     const r = roll.toLowerCase();
-    // Common roll number patterns:
-    // xxwh1a05xx → CSE  (05)
-    // xxwh1a12xx → ECE  (12)
-    // xxwh1a42xx → EEE  (42) or xxwh1a44xx
-    // xxwh1a66xx → AIML (66)
-    // Pattern: look for the branch code segment (digits after 'a')
     const match = r.match(/wh\d[a-z](\d{2})/);
     if (match) {
         const code = match[1];
@@ -625,7 +578,6 @@ function guessBranchFromRoll(roll) {
         if (code === '42' || code === '44') return 'EEE';
         if (code === '66') return 'AIML';
     }
-    // Fallback: check for branch name in roll itself
     if (r.includes('cse')) return 'CSE';
     if (r.includes('ece')) return 'ECE';
     if (r.includes('eee')) return 'EEE';
@@ -649,11 +601,10 @@ function guessYearFromRoll(roll) {
 }
 
 // ─── UI: Year Selection ───────────────────────────────────────────────────────
-// Always show all 4 years; grey out years with no data but still clickable
 const ALL_YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 
 function renderYearSelection() {
-    renderEditYearCards(); // refresh status cards with new data counts
+    renderEditYearCards();
 
     const container = document.getElementById('yearButtons');
     container.innerHTML = '';
@@ -682,13 +633,11 @@ function renderYearSelection() {
 }
 
 // ─── UI: Branch Selection ─────────────────────────────────────────────────────
-// Fixed branch display order
 const BRANCH_ORDER = ['EEE', 'ECE', 'CSE', 'AIML', 'MECH', 'CIVIL'];
 
 function renderBranchSelection(year) {
     const yearData = editParsedData.filter(s => s.year === year);
 
-    // Get branches from data, sorted by preferred order
     const branchesInData = [...new Set(yearData.map(s => s.branch))];
     const branches = BRANCH_ORDER.filter(b => branchesInData.includes(b))
         .concat(branchesInData.filter(b => !BRANCH_ORDER.includes(b)).sort());
@@ -707,7 +656,6 @@ function renderBranchSelection(year) {
 
     branches.forEach(branch => {
         const count = yearData.filter(s => s.branch === branch).length;
-        // Count sections for this branch
         const sectionCount = [...new Set(yearData.filter(s => s.branch === branch).map(s => s.section))].length;
         const btn = document.createElement('button');
         btn.className = 'edit-branch-btn';
@@ -725,7 +673,6 @@ function renderBranchSelection(year) {
     document.getElementById('sectionCard').style.display = 'none';
     document.getElementById('tableCard').style.display = 'none';
 
-    // Scroll to branch card
     document.getElementById('branchCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -772,7 +719,6 @@ function renderRollTable(year, branch, section) {
     document.getElementById('tableCardSub').textContent =
         `${students.length} student${students.length !== 1 ? 's' : ''}. Use Edit on a row, then Save Changes.`;
 
-    // Store current selection for save
     document.getElementById('tableCard').dataset.year = year;
     document.getElementById('tableCard').dataset.branch = branch;
     document.getElementById('tableCard').dataset.section = section;
@@ -1054,5 +1000,181 @@ async function saveAllEditDataToSystem() {
         setEditStatus(`Could not replace the student database: ${error.message}`, 'red');
         alert(`Could not replace the student database: ${error.message}`);
         return false;
+    }
+}
+
+// ─── Invigilators ─────────────────────────────────────────────────────────────
+
+function initInvigilatorView() {
+    const container = document.getElementById('invigilatorView');
+    if (!container) return;
+    container.innerHTML = `
+        <div style="margin-bottom:24px;">
+            <h1 style="margin:0 0 4px 0;color:#1a202c;font-size:24px;font-weight:700;">👩‍🏫 Invigilators</h1>
+            <p style="margin:0;color:#6b7280;font-size:14px;">Upload invigilator availability sheets (one per department). Each sheet should follow the standard format with faculty names and date/slot availability.</p>
+        </div>
+        <div style="background:white;border:2px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:16px;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <label for="invigilatorUploadInput" class="ed-btn ed-btn-blue" style="cursor:pointer;">↑ Upload Invigilator Sheet</label>
+                <input type="file" id="invigilatorUploadInput" accept=".xlsx,.xls" style="display:none;" onchange="handleInvigilatorUpload(event)">
+                <span id="invigilatorUploadStatus" style="font-size:13px;color:#6b7280;"></span>
+            </div>
+        </div>
+        <div id="invigilatorListContainer"></div>
+    `;
+    loadInvigilatorList();
+}
+
+async function handleInvigilatorUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('invigilatorUploadStatus');
+    statusEl.textContent = '⏳ Parsing...';
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const wb = XLSX.read(e.target.result, { type: 'array' });
+            const allRecords = [];
+
+            wb.SheetNames.forEach(sheetName => {
+                const ws = wb.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+                let department = 'Unknown';
+                for (let i = 0; i < Math.min(10, rows.length); i++) {
+                    const rowText = (rows[i] || []).join(' ');
+                    const deptMatch = rowText.match(/Department\s*[:\-]?\s*([A-Z]+)/i);
+                    if (deptMatch) { department = deptMatch[1].toUpperCase(); break; }
+                }
+
+                let headerRowIdx = -1;
+                for (let i = 0; i < rows.length; i++) {
+                    const hasDate = (rows[i] || []).some(c => String(c||'').match(/\d{2}-\d{2}-\d{4}/));
+                    if (hasDate) { headerRowIdx = i; break; }
+                }
+                if (headerRowIdx === -1) return;
+
+                const slotRowIdx = headerRowIdx + 1;
+                const headerRow = rows[headerRowIdx] || [];
+                const slotRow = rows[slotRowIdx] || [];
+
+                const dateCols = [];
+                headerRow.forEach((cell, colIdx) => {
+                    const dateMatch = String(cell||'').match(/(\d{2}-\d{2}-\d{4})/);
+                    if (dateMatch) {
+                        const [dd, mm, yyyy] = dateMatch[1].split('-');
+                        const isoDate = `${yyyy}-${mm}-${dd}`;
+                        const slot = String(slotRow[colIdx]||'').trim().toUpperCase() || 'FN';
+                        dateCols.push({ colIdx, date: isoDate, slot });
+                    }
+                });
+
+                for (let i = slotRowIdx + 1; i < rows.length; i++) {
+                    const row = rows[i] || [];
+                    const sno = row[0];
+                    const name = String(row[1]||'').trim();
+                    if (!name || !sno || typeof sno !== 'number') continue;
+
+                    dateCols.forEach(({ colIdx, date, slot }) => {
+                        const val = String(row[colIdx]||'').trim();
+                        if (val && val !== '' && val !== 'null') {
+                            allRecords.push({ name, department, date, slot, assigned: false });
+                        }
+                    });
+                }
+            });
+
+            if (allRecords.length === 0) {
+                statusEl.textContent = '❌ No records found. Check file format.';
+                return;
+            }
+
+            const batch = db.batch();
+            const dates = [...new Set(allRecords.map(r => r.date))];
+            const dept = allRecords[0].department;
+            const existing = await db.collection('invigilators')
+                .where('department', '==', dept)
+                .where('date', 'in', dates.slice(0, 10))
+                .get();
+            existing.docs.forEach(doc => batch.delete(doc.ref));
+
+            allRecords.forEach(record => {
+                const ref = db.collection('invigilators').doc();
+                batch.set(ref, { ...record, uploadedAt: new Date().toISOString() });
+            });
+
+            await batch.commit();
+            statusEl.textContent = `✅ Saved ${allRecords.length} invigilator slots from ${dept}`;
+            event.target.value = '';
+            loadInvigilatorList();
+        } catch(err) {
+            console.error(err);
+            statusEl.textContent = '❌ Parse error: ' + err.message;
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+async function loadInvigilatorList() {
+    const container = document.getElementById('invigilatorListContainer');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#6b7280;font-size:13px;">Loading...</p>';
+
+    try {
+        const snapshot = await db.collection('invigilators').get();
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="color:#6b7280;font-size:13px;">No invigilators uploaded yet.</p>';
+            return;
+        }
+
+        const byDept = {};
+        snapshot.docs.forEach(doc => {
+            const d = doc.data();
+            if (!byDept[d.department]) byDept[d.department] = [];
+            byDept[d.department].push({ id: doc.id, ...d });
+        });
+
+        let html = '';
+        Object.entries(byDept).forEach(([dept, records]) => {
+            const bySlot = {};
+            records.forEach(r => {
+                const key = `${r.date} ${r.slot}`;
+                if (!bySlot[key]) bySlot[key] = [];
+                bySlot[key].push(r.name);
+            });
+
+            html += `<div style="background:white;border:2px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <strong style="font-size:15px;">${dept} Department</strong>
+                    <button onclick="clearInvigilatorsByDept('${dept}')" class="ed-btn ed-btn-danger-outline ed-btn-sm">Clear</button>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+
+            Object.entries(bySlot).sort().forEach(([slot, names]) => {
+                html += `<div style="background:#f0f4ff;border:1px solid #c7d7ff;border-radius:6px;padding:8px 12px;font-size:12px;">
+                    <strong>${slot}</strong>: ${names.join(', ')}
+                </div>`;
+            });
+
+            html += `</div></div>`;
+        });
+
+        container.innerHTML = html;
+    } catch(err) {
+        container.innerHTML = `<p style="color:red;">Error loading: ${err.message}</p>`;
+    }
+}
+
+async function clearInvigilatorsByDept(dept) {
+    if (!confirm(`Remove all invigilator records for ${dept} department?`)) return;
+    try {
+        const snapshot = await db.collection('invigilators').where('department', '==', dept).get();
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        loadInvigilatorList();
+    } catch(err) {
+        alert('Error: ' + err.message);
     }
 }

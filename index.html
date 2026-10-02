@@ -29,7 +29,7 @@
             
             <div style="margin: 20px 0;">
                 <p style="text-align: center; color: #6c757d; margin-bottom: 12px; font-size: 13px;">Admin Sign-In</p>
-                <button type="button" onclick="startAdminSignIn()" style="display: block; margin: 0 auto 12px; padding: 11px 16px; width: 320px; max-width: 100%; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer;">🔑 Admin</button>
+                <button type="button" onclick="devAccess()" style="display: block; margin: 0 auto 12px; padding: 11px 16px; width: 320px; max-width: 100%; background: #6c757d; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer;">🛠️ Dev Access</button>
                 <div id="g_id_onload"
                      data-client_id="361381758196-dkfkah9p0rdri0hrp1gbgdtnqqrkmul5.apps.googleusercontent.com"
                      data-callback="handleGoogleLogin"
@@ -53,6 +53,14 @@
     
     <script src="login.js"></script>
     <script>
+        function devAccess() {
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('userEmail', 'navyachinta31545@gmail.com');
+            sessionStorage.setItem('userName', 'Dev');
+            sessionStorage.setItem('userRole', 'admin');
+            window.location.href = 'admin.html';
+        }
+
         function startAdminSignIn() {
             if (window.google?.accounts?.id) {
                 window.google.accounts.id.prompt();

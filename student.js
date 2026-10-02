@@ -60,6 +60,20 @@ function showSeatResult(table, seat, rollLower) {
     document.getElementById('bench').textContent = benchNo || 'N/A';
     document.getElementById('classroomLabel').textContent = seat.classroom || '';
 
+    // Show invigilator if available
+    const roomInvigilators = table.roomInvigilators || {};
+    const invigilators = roomInvigilators[seat.classroom] || [];
+    const invigilatorRow = document.getElementById('invigilatorRow');
+    const invigilatorVal = document.getElementById('invigilatorValue');
+    if (invigilatorRow && invigilatorVal) {
+        if (invigilators.length > 0) {
+            invigilatorVal.textContent = invigilators.join(', ');
+            invigilatorRow.style.display = 'flex';
+        } else {
+            invigilatorRow.style.display = 'none';
+        }
+    }
+
     renderLayout(benchNo, seatNum);
 }
 
@@ -70,16 +84,38 @@ function renderLayout(benchNo, seatNum) {
         grid.innerHTML = '<p style="color:#a0aec0;text-align:center;">Layout unavailable</p>';
         return;
     }
+
     const totalBenches = Math.max(28, benchNo);
-    for (let b = 1; b <= totalBenches; b++) {
-        const benchEl = document.createElement('div');
-        benchEl.className = 'bench-cell';
-        for (let s = 1; s <= 2; s++) {
-            const seatEl = document.createElement('div');
-            seatEl.className = 'seat' + (b === benchNo && s === seatNum ? ' seat-mine' : '');
-            benchEl.appendChild(seatEl);
+    const benchesPerCol = 7;
+    const numCols = Math.ceil(totalBenches / benchesPerCol);
+
+    // Build 4-column grid matching results page layout
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = `repeat(${numCols}, auto)`;
+    grid.style.gap = '8px';
+    grid.style.alignItems = 'start';
+
+    for (let col = 0; col < numCols; col++) {
+        const colDiv = document.createElement('div');
+        colDiv.style.display = 'flex';
+        colDiv.style.flexDirection = 'column';
+        colDiv.style.gap = '4px';
+
+        for (let row = 0; row < benchesPerCol; row++) {
+            const b = col * benchesPerCol + row + 1;
+            if (b > totalBenches) break;
+
+            const benchEl = document.createElement('div');
+            benchEl.className = 'bench-cell';
+
+            for (let s = 1; s <= 2; s++) {
+                const seatEl = document.createElement('div');
+                seatEl.className = 'seat' + (b === benchNo && s === seatNum ? ' seat-mine' : '');
+                benchEl.appendChild(seatEl);
+            }
+            colDiv.appendChild(benchEl);
         }
-        grid.appendChild(benchEl);
+        grid.appendChild(colDiv);
     }
 }
 
@@ -108,7 +144,19 @@ async function searchSeat(rollNumber) {
             }
 
             const accessStart = new Date(examDateTime.getTime() - (60 * 60 * 1000));
-            if (now >= accessStart) {
+
+            // Build end time if available
+            let accessEnd = null;
+            if (table.examEndTime) {
+                const [endHours, endMinutes] = table.examEndTime.split(':').map(Number);
+                const [year, month, day] = table.examDateISO.split('-').map(Number);
+                accessEnd = new Date(year, month - 1, day, endHours, endMinutes, 0, 0);
+            }
+
+            const withinStart = now >= accessStart;
+            const withinEnd = !accessEnd || now <= accessEnd;
+
+            if (withinStart && withinEnd) {
                 eligibleTables.push({ id: doc.id, ...table, examDateTime });
             }
         });

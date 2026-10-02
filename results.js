@@ -27,21 +27,30 @@ window.onload = function() {
 
 function displayClassroomTables(seatingData, sections) {
     let html = '<h2>🏫 Seating Arrangement by Classroom</h2>';
+    const roomInvigilators = JSON.parse(sessionStorage.getItem('roomInvigilators') || '{}');
 
     sections.forEach(classroom => {
         const seats = seatingData.filter(row => row.classroom === classroom.name);
         if (seats.length === 0) return;
 
         const normalSeats = seats.slice(0, 28);
-        const extraSeats  = seats.slice(28); // up to 4 overflow benches
+        const extraSeats  = seats.slice(28);
 
         const col1 = normalSeats.slice(0, 7);
         const col2 = normalSeats.slice(7, 14);
         const col3 = normalSeats.slice(14, 21);
         const col4 = normalSeats.slice(21, 28);
 
+        const invigilators = roomInvigilators[classroom.name] || [];
+        const invigilatorHtml = invigilators.length > 0
+            ? `<div style="margin-bottom:10px;padding:8px 12px;background:#f0f4ff;border-radius:6px;font-size:13px;">
+                👩‍🏫 <strong>Invigilator${invigilators.length > 1 ? 's' : ''}:</strong> ${invigilators.join(', ')}
+               </div>`
+            : '';
+
         html += `<div class="classroom-table" style="margin-top: 30px;">
             <h3>🚪 ${classroom.name}</h3>
+            ${invigilatorHtml}
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 10px;">`;
 
         [col1, col2, col3, col4].forEach(col => {
@@ -54,7 +63,6 @@ function displayClassroomTables(seatingData, sections) {
 
         html += `</div>`;
 
-        // Extra row: overflow benches continue in the same 4-column grid as a new row
         if (extraSeats.length > 0) {
             const extraCols = [[], [], [], []];
             extraSeats.forEach((row, idx) => extraCols[idx].push(row));
@@ -232,7 +240,8 @@ async function saveData() {
             tableName: tableName,
             ...tableMetadata,
             createdAt: new Date().toISOString(),
-            seatingData: seatingData
+            seatingData: seatingData,
+            roomInvigilators: JSON.parse(sessionStorage.getItem('roomInvigilators') || '{}')
         });
         
         console.log('✅ Table saved to Firebase');

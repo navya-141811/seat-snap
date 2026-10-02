@@ -35,6 +35,7 @@
             <h2>🎓 Admin Panel</h2>
             <button class="sidebar-btn" onclick="showView('tables')">📋 All Tables</button>
             <button class="sidebar-btn" onclick="showView('edit')">👥 Students Data</button>
+            <button class="sidebar-btn" onclick="showView('invigilators')">👩‍🏫 Invigilators</button>
             <div class="sidebar-section-title">Generated Tables</div>
             <div id="sidebarTablesList" class="sidebar-tables-list"></div>
             <button class="sidebar-btn logout" onclick="logout()">🚪 Logout</button>
@@ -77,8 +78,13 @@
                         </div>
                         
                         <div class="form-group" id="examTimeSection" style="display: none;">
-                            <label>🕐 Exam Time:</label>
+                            <label>🕐 Exam Start Time:</label>
                             <input type="time" id="examTime" onchange="checkReady()" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
+                        </div>
+
+                        <div class="form-group" id="examEndTimeSection" style="display: none;">
+                            <label>🕑 Exam End Time:</label>
+                            <input type="time" id="examEndTime" onchange="checkReady()" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px;">
                         </div>
                         
                         <div id="roomAssignmentSection" style="display: none; margin-top: 30px;"></div>
@@ -99,6 +105,7 @@
                 <div id="tablesContainer"></div>
             </div>
             <div id="editView"></div>
+            <div id="invigilatorView" style="display:none; width:100%;"></div>
         </div>
     </div>
 
@@ -116,8 +123,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="app-multiyear.js?v=append-delete-roll-menu-20260926"></script>
-    <script src="edit-data.js?v=append-delete-roll-menu-20260926"></script>
+    <script src="app-multiyear.js?v=column-wise-seating-20261002"></script>
+    <script src="edit-data.js?v=invigilator-fix-20261002"></script>
     <script src="login.js"></script>
     <script>
         const adminEmail = (sessionStorage.getItem('userEmail') || '').trim().toLowerCase();
@@ -150,14 +157,23 @@
                 document.getElementById('startView').style.display = 'none';
                 document.getElementById('generateFormView').style.display = 'none';
                 document.getElementById('editView').style.display = 'none';
+                document.getElementById('invigilatorView').style.display = 'none';
                 document.getElementById('allTablesView').style.display = 'block';
                 loadAllTables(selectedTableId);
             } else if (view === 'edit') {
                 document.getElementById('startView').style.display = 'none';
                 document.getElementById('generateFormView').style.display = 'none';
                 document.getElementById('allTablesView').style.display = 'none';
+                document.getElementById('invigilatorView').style.display = 'none';
                 document.getElementById('editView').style.display = 'block';
                 initEditView();
+            } else if (view === 'invigilators') {
+                document.getElementById('startView').style.display = 'none';
+                document.getElementById('generateFormView').style.display = 'none';
+                document.getElementById('allTablesView').style.display = 'none';
+                document.getElementById('editView').style.display = 'none';
+                document.getElementById('invigilatorView').style.display = 'block';
+                initInvigilatorView();
             }
         }
         

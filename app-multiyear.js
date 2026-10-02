@@ -278,6 +278,7 @@ function updateSubjects(year) {
     const hasBranches = yearData[year].branches.size > 0;
     document.getElementById('examDetailsSection').style.display = hasBranches || anyBranchesSelected() ? 'block' : 'none';
     document.getElementById('examTimeSection').style.display = hasBranches || anyBranchesSelected() ? 'block' : 'none';
+    document.getElementById('examEndTimeSection').style.display = hasBranches || anyBranchesSelected() ? 'block' : 'none';
 }
 
 function selectSubject(year, branch, subject) {
@@ -292,8 +293,9 @@ function anyBranchesSelected() {
 function hasCompleteSelection() {
     const examDate = document.getElementById('examDate')?.value;
     const examTime = document.getElementById('examTime')?.value;
+    const examEndTime = document.getElementById('examEndTime')?.value;
 
-    if (!selectedSemester || selectedYears.size === 0 || !examDate || !examTime) {
+    if (!selectedSemester || selectedYears.size === 0 || !examDate || !examTime || !examEndTime) {
         return false;
     }
 
@@ -826,6 +828,7 @@ function generateMultiYearArrangement() {
 
     const examDate = document.getElementById('examDate').value;
     const examTime = document.getElementById('examTime').value;
+    const examEndTime = document.getElementById('examEndTime').value;
     const { allStudents, branchSelections } = buildStudentAndSectionData();
     const firstYear = Array.from(selectedYears)[0];
     const examType = yearData[firstYear]?.mid || '';
@@ -854,6 +857,7 @@ function generateMultiYearArrangement() {
         yearData: serializedYearData,
         examDate,
         examTime,
+        examEndTime,
         examDateISO: examDate,
         selectedRooms: Array.from(selectedRooms),
         totalStudents: allStudents.length
@@ -865,7 +869,52 @@ function generateMultiYearArrangement() {
     sessionStorage.setItem('tableMetadata', JSON.stringify(tableMetadata));
     localStorage.setItem('tableMetadata', JSON.stringify(tableMetadata));
 
-    window.location.href = 'results.html';
+    // Assign invigilators and then navigate
+    assignInvigilatorsToRooms(Array.from(selectedRooms), examDate, examTime).then(roomInvigilators => {
+        sessionStorage.setItem('roomInvigilators', JSON.stringify(roomInvigilators));
+        window.location.href = 'results.html';
+    });
+}
+
+async function assignInvigilatorsToRooms(rooms, examDateISO, examTime) {
+    try {
+        // Determine slot: FN = before 1pm, AN = afternoon
+        const slot = examTime < '13:00' ? 'FN' : 'AN';
+
+        const snapshot = await db.collection('invigilators')
+            .where('date', '==', examDateISO)
+            .where('slot', '==', slot)
+            .where('assigned', '==', false)
+            .get();
+
+        const available = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Shuffle available invigilators randomly
+        for (let i = available.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [available[i], available[j]] = [available[j], available[i]];
+        }
+
+        const roomInvigilators = {};
+        const batch = db.batch();
+        let pointer = 0;
+
+        rooms.forEach(room => {
+            const assigned = [];
+            // Assign up to 2 invigilators per room
+            for (let n = 0; n < 2 && pointer < available.length; n++, pointer++) {
+                assigned.push(available[pointer].name);
+                batch.update(db.collection('invigilators').doc(available[pointer].id), { assigned: true });
+            }
+            roomInvigilators[room] = assigned;
+        });
+
+        if (pointer > 0) await batch.commit();
+        return roomInvigilators;
+    } catch(err) {
+        console.error('Error assigning invigilators:', err);
+        return {};
+    }
 }
 
 function allocateStudentsToBenches(students, examType = '') {
@@ -883,31 +932,97 @@ function allocateStudentsToBenches(students, examType = '') {
     const seatedRollNumbers = new Set();
     const benches = [];
     let benchCount = 0;
-    let keepGoing = true;
 
-    while (keepGoing) {
-        keepGoing = false;
-        for (let i = 0; i < subjects.length; i++) {
-            for (let j = i + 1; j < subjects.length; j++) {
-                const list1 = studentsBySubject[subjects[i]];
-                const list2 = studentsBySubject[subjects[j]];
-                if (!list1.length || !list2.length) continue;
+    if (isSem) {
+        // Sem: interleaved round-robin pairing across subjects
+        let keepGoing = true;
+        while (keepGoing) {
+            keepGoing = false;
+            for (let i = 0; i < subjects.length; i++) {
+                for (let j = i + 1; j < subjects.length; j++) {
+                    const list1 = studentsBySubject[subjects[i]];
+                    const list2 = studentsBySubject[subjects[j]];
+                    if (!list1.length || !list2.length) continue;
 
-                const student1 = list1.shift();
-                const student2 = list2.shift();
+                    const student1 = list1.shift();
+                    const student2 = list2.shift();
 
-                if (student1.section === student2.section) {
-                    list1.unshift(student1);
-                    list2.unshift(student2);
-                    continue;
+                    if (student1.section === student2.section) {
+                        list1.unshift(student1);
+                        list2.unshift(student2);
+                        continue;
+                    }
+
+                    const swap = benchCount % 2 === 1;
+                    benches.push({ seat1: swap ? student2 : student1, seat2: swap ? student1 : student2 });
+                    seatedRollNumbers.add(student1.rollNo);
+                    seatedRollNumbers.add(student2.rollNo);
+                    benchCount++;
+                    keepGoing = true;
                 }
+            }
+        }
+    } else {
+        // Mid: column-wise pairing.
+        //
+        // Constraints:
+        //   1. No two students with the same subject on the same bench.
+        //   2. Each column must be sequential — all students of one section top to bottom,
+        //      then the next section, with no interleaving between sections.
+        //
+        // Strategy:
+        //   - Sort students so all of CSE-A comes first, then CSE-B, then ECE-A, ECE-B, etc.
+        //     (Firebase may return them interleaved; this corrects that.)
+        //   - Group by subject (all CSE together as listA, all ECE together as listB).
+        //   - Zip listA with listB bench-by-bench → different subjects on every bench ✅,
+        //     sequential roll numbers down each column ✅.
 
-                const swap = isSem && (benchCount % 2 === 1);
-                benches.push({ seat1: swap ? student2 : student1, seat2: swap ? student1 : student2 });
-                seatedRollNumbers.add(student1.rollNo);
-                seatedRollNumbers.add(student2.rollNo);
-                benchCount++;
-                keepGoing = true;
+        // Step 1: sort students — primary: section (preserves A,B,C... order), secondary: rollNo.
+        const sectionOrder = {};
+        students.forEach(s => {
+            if (!(s.section in sectionOrder)) sectionOrder[s.section] = Object.keys(sectionOrder).length;
+        });
+        const sorted = [...students].sort((a, b) => {
+            const si = sectionOrder[a.section] - sectionOrder[b.section];
+            if (si !== 0) return si;
+            return String(a.rollNo).localeCompare(String(b.rollNo), undefined, { numeric: true });
+        });
+
+        // Step 2: group sorted students by subject.
+        const subjectKeys = [];
+        const studentsBySubject = {};
+        sorted.forEach(student => {
+            const key = normalize(student.subject);
+            if (!studentsBySubject[key]) {
+                subjectKeys.push(key);
+                studentsBySubject[key] = [];
+            }
+            studentsBySubject[key].push(student);
+        });
+
+        // Step 3: zip subject pairs bench-by-bench.
+        for (let si = 0; si < subjectKeys.length; si += 2) {
+            const listA = studentsBySubject[subjectKeys[si]];
+            const listB = si + 1 < subjectKeys.length
+                ? studentsBySubject[subjectKeys[si + 1]]
+                : [];
+
+            const maxLen = Math.max(listA.length, listB.length);
+            for (let i = 0; i < maxLen; i++) {
+                const studentA = i < listA.length ? listA[i] : null;
+                const studentB = i < listB.length ? listB[i] : null;
+
+                if (studentA && studentB) {
+                    benches.push({ seat1: studentA, seat2: studentB });
+                    seatedRollNumbers.add(studentA.rollNo);
+                    seatedRollNumbers.add(studentB.rollNo);
+                } else if (studentA) {
+                    benches.push({ seat1: studentA, seat2: null });
+                    seatedRollNumbers.add(studentA.rollNo);
+                } else if (studentB) {
+                    benches.push({ seat1: studentB, seat2: null });
+                    seatedRollNumbers.add(studentB.rollNo);
+                }
             }
         }
     }
@@ -983,24 +1098,127 @@ async function loadAllTables(selectedTableId = null) {
 
         tables.forEach(table => {
             const selectedRoomCount = Array.isArray(table.selectedRooms) ? table.selectedRooms.length : Array.from(new Set((table.seatingData || []).map(seat => seat.classroom))).length;
-            const card = document.createElement('div');
             const isSelected = selectedTableId && selectedTableId === table.id;
-            card.style.cssText = `background: white; padding: 20px; margin: 10px 0; border-radius: 8px; border: 2px solid ${isSelected ? '#4a90e2' : '#e0e0e0'};`;
+            const card = document.createElement('div');
+            card.id = `table-card-${table.id}`;
+            card.style.cssText = `background: white; margin: 10px 0; border-radius: 8px; border: 2px solid ${isSelected ? '#4a90e2' : '#e0e0e0'}; overflow: hidden;`;
+
             card.innerHTML = `
-                <h3>${getTableDisplayName(table)}</h3>
-                <p><strong>Semester:</strong> ${table.semester}</p>
-                <p><strong>Years:</strong> ${table.years.join(', ')}</p>
-                <p><strong>Date:</strong> ${table.examDate} | <strong>Time:</strong> ${table.examTime}</p>
-                <p><strong>Rooms:</strong> ${selectedRoomCount}</p>
-                <button onclick="deleteTable('${table.id}')" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                <div onclick="toggleTableExpand('${table.id}')" style="padding: 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h3 style="margin: 0 0 8px 0;">${getTableDisplayName(table)}</h3>
+                        <p style="margin: 3px 0;"><strong>Semester:</strong> ${table.semester} &nbsp;|&nbsp; <strong>Years:</strong> ${table.years.join(', ')}</p>
+                        <p style="margin: 3px 0;"><strong>Date:</strong> ${table.examDate} &nbsp;|&nbsp; <strong>Time:</strong> ${table.examTime} &nbsp;|&nbsp; <strong>Rooms:</strong> ${selectedRoomCount}</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span id="chevron-${table.id}" style="font-size: 20px; transition: transform 0.2s;">${isSelected ? '▲' : '▼'}</span>
+                        <button onclick="event.stopPropagation(); deleteTable('${table.id}')" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                    </div>
+                </div>
+                <div id="table-expand-${table.id}" style="display: ${isSelected ? 'block' : 'none'}; padding: 0 20px 20px; border-top: 1px solid #e0e0e0;">
+                    <div id="table-content-${table.id}"></div>
+                </div>
             `;
             container.appendChild(card);
+
+            // If this card is pre-selected, render its content immediately
+            if (isSelected) {
+                renderTableContent(table);
+            }
         });
+
         await loadTablesSidebar(selectedTableId);
     } catch (error) {
         console.error('Error loading tables:', error);
         container.innerHTML = '<p style="color: red;">Error loading tables</p>';
     }
+}
+
+function toggleTableExpand(tableId) {
+    const expandDiv = document.getElementById(`table-expand-${tableId}`);
+    const chevron = document.getElementById(`chevron-${tableId}`);
+    const isOpen = expandDiv.style.display === 'block';
+
+    if (isOpen) {
+        expandDiv.style.display = 'none';
+        chevron.textContent = '▼';
+    } else {
+        expandDiv.style.display = 'block';
+        chevron.textContent = '▲';
+        // Load content if not already loaded
+        const contentDiv = document.getElementById(`table-content-${tableId}`);
+        if (!contentDiv.dataset.loaded) {
+            // Fetch from Firebase and render
+            db.collection('examTables').doc(tableId).get().then(doc => {
+                if (doc.exists) {
+                    renderTableContent({ id: doc.id, ...doc.data() });
+                }
+            });
+        }
+    }
+}
+
+function renderTableContent(table) {
+    const contentDiv = document.getElementById(`table-content-${table.id}`);
+    if (!contentDiv) return;
+    contentDiv.dataset.loaded = 'true';
+
+    const seatingData = table.seatingData || [];
+    const rooms = Array.isArray(table.selectedRooms) && table.selectedRooms.length > 0
+        ? table.selectedRooms
+        : Array.from(new Set(seatingData.map(s => s.classroom).filter(Boolean)));
+
+    let html = '';
+    rooms.forEach(roomName => {
+        const seats = seatingData.filter(row => row.classroom === roomName);
+        if (seats.length === 0) return;
+
+        const normalSeats = seats.slice(0, 28);
+        const extraSeats = seats.slice(28);
+
+        const col1 = normalSeats.slice(0, 7);
+        const col2 = normalSeats.slice(7, 14);
+        const col3 = normalSeats.slice(14, 21);
+        const col4 = normalSeats.slice(21, 28);
+
+        html += `<div style="margin-top: 24px;">
+            <h4 style="background: #4a90e2; color: white; padding: 10px 15px; border-radius: 6px; margin-bottom: 10px;">🚪 ${roomName}</h4>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">`;
+
+        [col1, col2, col3, col4].forEach(col => {
+            html += `<table style="width:100%;border-collapse:collapse;"><tbody>`;
+            col.forEach(row => {
+                html += `<tr>
+                    <td style="padding:6px 8px;border:1px solid #e0e0e0;">${row.seat1 ? row.seat1.rollNo : '-'}</td>
+                    <td style="padding:6px 8px;border:1px solid #e0e0e0;">${row.seat2 ? row.seat2.rollNo : '-'}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+        });
+
+        html += `</div>`;
+
+        if (extraSeats.length > 0) {
+            const extraCols = [[], [], [], []];
+            extraSeats.forEach((row, idx) => extraCols[idx % 4].push(row));
+            html += `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 4px;">`;
+            extraCols.forEach(col => {
+                html += `<table style="width:100%;border-collapse:collapse;"><tbody>`;
+                col.forEach(row => {
+                    html += `<tr>
+                        <td style="padding:6px 8px;border:1px solid #e0e0e0;">${row.seat1 ? row.seat1.rollNo : '-'}</td>
+                        <td style="padding:6px 8px;border:1px solid #e0e0e0;">${row.seat2 ? row.seat2.rollNo : '-'}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            });
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+    });
+
+    contentDiv.innerHTML = html || '<p style="color:#6b7280;">No seating data found.</p>';
 }
 
 async function deleteTable(id) {
