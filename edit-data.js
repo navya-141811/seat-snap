@@ -156,8 +156,34 @@ async function handleYearUpload(event, year) {
         try {
             let newStudents = [];
             if (ext === '.csv') {
-                const rows = file.content.split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g,'')));
-                // fallback to processRows logic — just use workbook path for simplicity
+                const workbook = XLSX.read(e.target.result, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                if (!rows || rows.length < 2) throw new Error('The CSV file is empty.');
+
+                const headers = rows[0].map(value => String(value).trim().toLowerCase());
+                const columns = detectColumns(headers);
+                if (columns.roll === -1) throw new Error('No roll number column found in the CSV header.');
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    const rollNo = String(row[columns.roll] || '').trim().toLowerCase();
+                    if (!rollNo) continue;
+                    const resolved = resolveYearBranchSection(
+                        columns.year === -1 ? '' : String(row[columns.year] || '').trim(),
+                        columns.branch === -1 ? '' : String(row[columns.branch] || '').trim(),
+                        columns.section === -1 ? '' : String(row[columns.section] || '').trim(),
+                        rollNo
+                    );
+                    newStudents.push({
+                        sno: newStudents.length + 1,
+                        rollNo,
+                        name: columns.name === -1 ? '—' : String(row[columns.name] || '').trim() || '—',
+                        year: resolved.year === 'Unknown Year' ? year : resolved.year,
+                        branch: resolved.branch,
+                        section: resolved.section
+                    });
+                }
+                if (!newStudents.length) throw new Error('No student rows with roll numbers were found.');
             } else {
                 const wb = XLSX.read(e.target.result, { type: 'array' });
                 wb.SheetNames.forEach(sheetName => {
@@ -181,16 +207,96 @@ async function handleYearUpload(event, year) {
                     }
                 });
             }
-            // Filter to only this year, merge into editParsedData
-            editParsedData = editParsedData.filter(s => s.year !== year).concat(newStudents.filter(s => s.year === year || !s.year));
-            editParsedData = sortEditStudentRecords(editParsedData);
-            if (statusEl) statusEl.textContent = `✅ ${newStudents.length} students`;
+            newStudents.forEach(student => {
+                if (!student.year || student.year === 'Unknown Year') student.year = year;
+            });
+            const mismatchedYear = newStudents.find(student => student.year !== year);
+            if (mismatchedYear) {
+                throw new Error(`This file contains ${mismatchedYear.year} data. Upload it from the ${mismatchedYear.year} card.`);
+            }
+            const unsupported = newStudents.find(student => !branchData[student.branch]);
+            if (unsupported) {
+                throw new Error(`Branch "${unsupported.branch}" is not supported for seating generation. Check the branch column or roll number.`);
+            }
+
+            const existingYearRecords = uploadedRosterRecords.filter(record => record.year === year);
+            if (existingYearRecords.length && !confirm(`Replace the saved ${year} roster with these ${newStudents.length} students? Other years will be kept.`)) {
+                if (statusEl) statusEl.textContent = 'Upload cancelled';
+                return;
+            }
+            if (statusEl) statusEl.textContent = `⏳ Saving ${newStudents.length} students...`;
+            await saveYearRoster(year, newStudents);
+
+            // Keep the editor view in sync with the saved roster.
+            editParsedData = sortEditStudentRecords(editParsedData.filter(s => s.year !== year).concat(newStudents));
             renderEditYearCards();
+            const updatedStatusEl = document.getElementById(`yearUploadStatus_${yearId}`);
+            if (updatedStatusEl) updatedStatusEl.textContent = `✅ Saved ${newStudents.length} students. Seating will use this roster.`;
         } catch(err) {
-            if (statusEl) statusEl.textContent = '❌ Parse error';
+            if (statusEl) statusEl.textContent = `❌ ${err.message || 'Parse error'}`;
         }
     };
     reader.readAsArrayBuffer(file);
+}
+
+async function saveYearRoster(year, students) {
+    const grouped = new Map();
+    for (const student of students) {
+        if (!student.rollNo || !student.year || !student.branch || !student.section) {
+            throw new Error('A student row is missing its roll number, year, branch, or section.');
+        }
+        const key = `${student.year} ${student.branch} ${student.section}`;
+        if (!grouped.has(key)) grouped.set(key, {
+            year: student.year,
+            branch: student.branch,
+            section: student.section,
+            students: []
+        });
+        grouped.get(key).students.push({
+            rollNo: String(student.rollNo).trim().toLowerCase(),
+            name: String(student.name || '').trim()
+        });
+    }
+
+    if (!grouped.size) throw new Error('No student rows with roll numbers were found.');
+
+    const collection = db.collection('studentSections');
+    const oldRecords = await collection.where('year', '==', year).get();
+    const timestamp = new Date().toISOString();
+    const newRecords = Array.from(grouped, ([key, record]) => ({
+        ...record,
+        key,
+        id: encodeURIComponent(key),
+        updatedAt: timestamp
+    }));
+    const operations = oldRecords.docs.map(doc => ({ type: 'delete', ref: doc.ref }))
+        .concat(newRecords.map(record => ({
+            type: 'set',
+            ref: collection.doc(record.id),
+            data: {
+                year: record.year,
+                branch: record.branch,
+                section: record.section,
+                students: record.students,
+                updatedAt: record.updatedAt
+            }
+        })));
+
+    for (let start = 0; start < operations.length; start += 450) {
+        const batch = db.batch();
+        operations.slice(start, start + 450).forEach(operation => {
+            if (operation.type === 'delete') batch.delete(operation.ref);
+            else batch.set(operation.ref, operation.data);
+        });
+        await batch.commit();
+    }
+
+    // Remove stale in-memory roll numbers for this year before applying its new records.
+    Object.keys(ROLL_NUMBERS).forEach(key => {
+        if (key.startsWith(`${year} `)) delete ROLL_NUMBERS[key];
+    });
+    uploadedRosterRecords = uploadedRosterRecords.filter(record => record.year !== year).concat(newRecords);
+    applyStudentSectionRecords(newRecords);
 }
 
 function editGoBack() {

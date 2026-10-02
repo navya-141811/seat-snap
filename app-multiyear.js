@@ -85,71 +85,41 @@ function getRollNumbersForYearSection(year, sectionName) {
     const normalizedSection = sectionName.replace('-', ' ');
     const fullSectionName = `${year} ${normalizedSection}`;
 
-    // Once an uploaded roster exists, use it as the only source. Do not fill
-    // missing uploaded sections with stale built-in roll numbers.
-    if (uploadedRosterRecords.length > 0) {
-        const compactKey = value => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const wantedKey = compactKey(fullSectionName);
-        const record = uploadedRosterRecords.find(item =>
-            compactKey(`${item.year} ${item.branch} ${item.section}`) === wantedKey
-        );
-        return record && Array.isArray(record.students)
-            ? record.students.map(student => String(student.rollNo || '').trim().toLowerCase()).filter(Boolean)
-            : [];
-    }
-
-    if (Array.isArray(ROLL_NUMBERS[fullSectionName])) {
-        return ROLL_NUMBERS[fullSectionName];
-    }
-
-    // Older roll-number data stores single-section branches such as EEE
-    // without an explicit "A" suffix (for example, "2nd Year EEE").
-    const sectionParts = normalizedSection.trim().split(/\s+/);
-    const section = sectionParts.pop();
-    if (section === 'A') {
-        const legacyKey = `${year} ${sectionParts.join(' ')}`;
-        if (Array.isArray(ROLL_NUMBERS[legacyKey])) {
-            return ROLL_NUMBERS[legacyKey];
-        }
-    }
-
-    // Tolerate harmless differences in case, spacing, and hyphenation.
     const compactKey = value => value.toLowerCase().replace(/[^a-z0-9]/g, '');
     const wantedKey = compactKey(fullSectionName);
-    const matchingKey = Object.keys(ROLL_NUMBERS).find(key => compactKey(key) === wantedKey);
-    return matchingKey && Array.isArray(ROLL_NUMBERS[matchingKey]) ? ROLL_NUMBERS[matchingKey] : [];
+    const record = uploadedRosterRecords.find(item =>
+        compactKey(`${item.year} ${item.branch} ${item.section}`) === wantedKey
+    );
+    return record && Array.isArray(record.students)
+        ? record.students.map(student => String(student.rollNo || '').trim().toLowerCase()).filter(Boolean)
+        : [];
 }
 
 function getStudentCountForYear(year) {
-    return Object.values(branchData).reduce((total, branch) =>
-        total + branch.sections.reduce((branchTotal, sectionName) =>
-            branchTotal + getRollNumbersForYearSection(year, sectionName).length, 0
-        ), 0
-    );
+    return uploadedRosterRecords
+        .filter(record => record.year === year && Array.isArray(record.students))
+        .reduce((total, record) => total + record.students.length, 0);
 }
 
 function updateYearAvailabilityButtons() {
     const availableYears = [];
-    const hasUploadedRoster = uploadedRosterRecords.length > 0;
     document.querySelectorAll('.year-btn[data-year]').forEach(button => {
         const year = button.dataset.year;
         const count = getStudentCountForYear(year);
-        button.textContent = hasUploadedRoster ? `${year} (${count} students)` : year;
-        button.disabled = hasUploadedRoster && count === 0;
-        button.style.opacity = hasUploadedRoster && count === 0 ? '0.45' : '1';
-        button.style.cursor = hasUploadedRoster && count === 0 ? 'not-allowed' : 'pointer';
-        button.title = hasUploadedRoster
-            ? (count === 0 ? 'No saved students for this year' : `${count} saved students`)
-            : 'Upload and save a workbook to display student totals';
-        if (hasUploadedRoster && count > 0) availableYears.push(`${year}: ${count}`);
+        const available = count > 0;
+        button.textContent = `${year} (${count} students)`;
+        button.hidden = false;
+        button.disabled = !available;
+        button.style.opacity = available ? '1' : '0.45';
+        button.style.cursor = available ? 'pointer' : 'not-allowed';
+        button.title = available ? `${count} saved students` : 'No saved roster for this year';
+        if (available) availableYears.push(`${year}: ${count}`);
     });
     const hint = document.getElementById('yearRosterHint');
     if (hint) {
-        hint.textContent = hasUploadedRoster
-            ? (availableYears.length
-                ? `Roster data available — ${availableYears.join(' · ')}`
-                : 'No student roster is currently available.')
-            : 'Upload and save a workbook to display roster totals.';
+        hint.textContent = availableYears.length
+            ? `Roster data available — ${availableYears.join(' · ')}`
+            : 'No saved roster data. Upload student data from Students Data before generating seating.';
     }
 }
 
@@ -300,6 +270,7 @@ function hasCompleteSelection() {
     }
 
     for (const year of selectedYears) {
+        if (getStudentCountForYear(year) === 0) return false;
         const data = yearData[year];
         if (!data || !data.mid || data.branches.size === 0) {
             return false;
