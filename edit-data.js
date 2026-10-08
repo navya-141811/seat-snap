@@ -834,6 +834,10 @@ function renderRollTable(year, branch, section) {
         wrapper.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px;">No students found for this selection.</p>';
     } else {
         wrapper.innerHTML = `
+            <label for="studentListSearch" style="display:block;margin:0 0 8px;font-size:13px;font-weight:600;color:#4a5568;">Search this section</label>
+            <input id="studentListSearch" type="search" placeholder="Search by roll number or name…" autocomplete="off"
+                style="width:100%;max-width:420px;margin-bottom:12px;padding:11px 14px;border:1px solid #cbd5e0;border-radius:8px;font-size:14px;">
+            <p id="studentListCount" aria-live="polite" style="margin:0 0 10px;color:#718096;font-size:13px;">Showing ${students.length} of ${students.length} students</p>
             <table class="ed-table">
                 <thead>
                     <tr>
@@ -843,23 +847,40 @@ function renderRollTable(year, branch, section) {
                         <th style="width:140px;">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${students.map(({ student, index }, rowIndex) => `
-                        <tr id="student-row-${index}">
-                            <td style="color:#9ca3af;">${rowIndex + 1}</td>
-                            <td style="font-family:monospace;font-size:13px;">${escapeEditHTML(student.rollNo)}</td>
-                            <td>${escapeEditHTML(student.name)}</td>
-                            <td>
-                                <div style="display:flex;gap:6px;">
-                                    <button class="ed-btn ed-btn-blue ed-btn-sm" onclick="editStudentRow(${index})">Edit</button>
-                                    <button class="ed-btn ed-btn-danger ed-btn-sm" onclick="deleteStudentRow(${index})" title="Remove student">Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
+                <tbody id="studentListBody"></tbody>
             </table>
         `;
+
+        const body = document.getElementById('studentListBody');
+        const search = document.getElementById('studentListSearch');
+        const count = document.getElementById('studentListCount');
+        const renderRows = query => {
+            const normalizedQuery = query.trim().toLocaleLowerCase();
+            const visibleStudents = students.filter(({ student }) =>
+                String(student.rollNo || '').toLocaleLowerCase().includes(normalizedQuery) ||
+                String(student.name || '').toLocaleLowerCase().includes(normalizedQuery)
+            );
+
+            count.textContent = `Showing ${visibleStudents.length} of ${students.length} students`;
+            body.innerHTML = visibleStudents.length
+                ? visibleStudents.map(({ student, index }, rowIndex) => `
+                    <tr id="student-row-${index}">
+                        <td style="color:#9ca3af;">${rowIndex + 1}</td>
+                        <td style="font-family:monospace;font-size:13px;">${escapeEditHTML(student.rollNo)}</td>
+                        <td>${escapeEditHTML(student.name)}</td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                <button class="ed-btn ed-btn-blue ed-btn-sm" onclick="editStudentRow(${index})">Edit</button>
+                                <button class="ed-btn ed-btn-danger ed-btn-sm" onclick="deleteStudentRow(${index})" title="Remove student">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="4" style="padding:20px;text-align:center;color:#9ca3af;">No students match your search.</td></tr>';
+        };
+
+        renderRows('');
+        search.addEventListener('input', () => renderRows(search.value));
     }
 
     document.getElementById('tableCard').style.display = 'block';

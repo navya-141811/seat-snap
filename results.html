@@ -23,6 +23,22 @@
         
         <div id="tableContainer"></div>
     </div>
+
+    <div id="saveProgressOverlay" class="save-progress-overlay" role="dialog" aria-modal="true" aria-labelledby="saveProgressTitle" aria-describedby="saveProgressMessage" hidden>
+        <div class="save-progress-card">
+            <div class="save-progress-icon" aria-hidden="true">📋</div>
+            <h2 id="saveProgressTitle">Saving your seating table</h2>
+            <p id="saveProgressMessage" aria-live="polite">Preparing your arrangement…</p>
+            <div class="save-progress-track" role="progressbar" aria-label="Save progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="saveProgressFill" class="save-progress-fill"></div>
+            </div>
+            <div class="save-progress-footer">
+                <span id="saveProgressStep">Preparing</span>
+                <span id="saveProgressPercent">0%</span>
+            </div>
+            <button id="saveProgressDismiss" class="save-progress-dismiss" type="button" hidden>Close</button>
+        </div>
+    </div>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>

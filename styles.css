@@ -117,6 +117,90 @@ button:active {
 .download-buttons button:hover {
 }
 
+.save-progress-overlay[hidden] {
+    display: none;
+}
+
+.save-progress-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(31, 41, 55, 0.55);
+    backdrop-filter: blur(4px);
+}
+
+.save-progress-card {
+    width: min(100%, 440px);
+    padding: 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    background: white;
+    box-shadow: 0 20px 60px rgba(31, 41, 55, 0.25);
+    text-align: center;
+}
+
+.save-progress-icon {
+    display: grid;
+    width: 58px;
+    height: 58px;
+    margin: 0 auto 16px;
+    place-items: center;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #eef2ff, #f3e8ff);
+    font-size: 28px;
+}
+
+.save-progress-card h2 {
+    margin: 0 0 8px;
+    font-size: 21px;
+}
+
+.save-progress-card > p {
+    min-height: 22px;
+    margin: 0 0 22px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.save-progress-track {
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e9edf5;
+}
+
+.save-progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #4a90e2, #7c3aed);
+    transition: width 350ms ease;
+}
+
+.save-progress-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.save-progress-dismiss {
+    margin: 22px 0 0;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .save-progress-fill {
+        transition: none;
+    }
+}
+
 .branch-buttons {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

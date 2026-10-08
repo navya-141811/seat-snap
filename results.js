@@ -1,5 +1,47 @@
 let seatingData = [];
 let overflowData = [];
+let isSaveInProgress = false;
+
+function updateSaveProgress(percent, step, message) {
+    const overlay = document.getElementById('saveProgressOverlay');
+    const fill = document.getElementById('saveProgressFill');
+    const track = overlay?.querySelector('[role="progressbar"]');
+    if (!overlay || !fill || !track) return;
+
+    const value = Math.max(0, Math.min(100, percent));
+    fill.style.width = `${value}%`;
+    track.setAttribute('aria-valuenow', String(value));
+    document.getElementById('saveProgressPercent').textContent = `${value}%`;
+    document.getElementById('saveProgressStep').textContent = step;
+    document.getElementById('saveProgressMessage').textContent = message;
+}
+
+function showSaveProgress() {
+    const overlay = document.getElementById('saveProgressOverlay');
+    const dismiss = document.getElementById('saveProgressDismiss');
+    if (!overlay) return;
+
+    dismiss.hidden = true;
+    overlay.hidden = false;
+    updateSaveProgress(5, 'Preparing', 'Preparing your arrangement…');
+}
+
+function hideSaveProgress() {
+    const overlay = document.getElementById('saveProgressOverlay');
+    if (overlay) overlay.hidden = true;
+}
+
+function dismissSaveProgress() {
+    hideSaveProgress();
+    isSaveInProgress = false;
+    window.isSavingData = false;
+    const saveButton = document.querySelector('.download-buttons button');
+    if (saveButton) saveButton.disabled = false;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('saveProgressDismiss')?.addEventListener('click', dismissSaveProgress);
+});
 
 // Load data from sessionStorage
 window.onload = function() {
@@ -179,6 +221,8 @@ function allocateOverflowSeats(students, classrooms) {
 }
 
 async function saveData() {
+    if (isSaveInProgress) return;
+
     const seatingData = JSON.parse(sessionStorage.getItem('seatingData'));
     const tableMetadata = JSON.parse(sessionStorage.getItem('tableMetadata') || localStorage.getItem('tableMetadata') || 'null');
     
@@ -197,13 +241,19 @@ async function saveData() {
     const defaultTableName = `${yearLabel}_${midLabels}_${tableMetadata.examDateISO}_${tableMetadata.examTime}_${branchesStr}`;
     
     const tableName = prompt('Enter table name:', defaultTableName);
-    if (!tableName) return;
-    
+    if (!tableName || !tableName.trim()) return;
+
+    isSaveInProgress = true;
+    const saveButton = document.querySelector('.download-buttons button');
+    if (saveButton) saveButton.disabled = true;
+    showSaveProgress();
+
     window.isSavingData = true;
     console.log('💾 Saving table to Firebase...');
     
     try {
         // Check for conflicts (same date + time + overlapping branches)
+        updateSaveProgress(25, 'Checking schedule', 'Looking for existing tables at this date and time…');
         const conflictSnapshot = await db.collection('examTables')
             .where('examDateISO', '==', tableMetadata.examDateISO)
             .where('examTime', '==', tableMetadata.examTime)
@@ -220,24 +270,27 @@ async function saveData() {
         });
         
         if (conflictingTable) {
+            updateSaveProgress(45, 'Checking overlap', 'Reviewing tables that share the selected branches…');
             const existingBranches = Array.isArray(conflictingTable.data.branches) ? conflictingTable.data.branches : [];
             const overlappingBranches = existingBranches.filter(branch => branches.includes(branch));
             const replace = confirm(`⚠️ ${overlappingBranches.join(', ')} already has exam at this time.\n\nExisting table: ${conflictingTable.data.tableName}\n\nDo you want to replace it?`);
             
             if (!replace) {
-                window.isSavingData = false;
+                dismissSaveProgress();
                 return;
             }
             
             // Delete conflicting table
+            updateSaveProgress(65, 'Replacing table', 'Removing the previous table before saving this arrangement…');
             await db.collection('examTables').doc(conflictingTable.id).delete();
             console.log('✅ Deleted conflicting table');
         }
         
         // Save table metadata and seating data
         const tableId = Date.now().toString();
+        updateSaveProgress(82, 'Saving table', 'Writing seating details to the database…');
         await db.collection('examTables').doc(tableId).set({
-            tableName: tableName,
+            tableName: tableName.trim(),
             ...tableMetadata,
             createdAt: new Date().toISOString(),
             seatingData: seatingData,
@@ -245,15 +298,18 @@ async function saveData() {
         });
         
         console.log('✅ Table saved to Firebase');
+        updateSaveProgress(100, 'Complete', 'Your seating table has been saved successfully.');
+        document.getElementById('saveProgressTitle').textContent = 'Table saved';
         window.isSavingData = false;
-        
-        alert('✅ Table saved successfully! Students can check their seats 1 hour before exam.');
-        window.location.href = 'admin.html';
+        window.setTimeout(() => {
+            window.location.href = 'admin.html';
+        }, 900);
         
     } catch (error) {
         console.error('❌ Firebase error:', error);
         window.isSavingData = false;
-        alert('❌ Error saving table: ' + error.message);
+        updateSaveProgress(82, 'Save failed', `Could not save the table: ${error.message}`);
+        document.getElementById('saveProgressDismiss').hidden = false;
     }
 }
 
