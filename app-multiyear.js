@@ -6,7 +6,8 @@ let occupiedRoomsForSelectedSlot = new Set();
 let roomRequirementContext = { totalStudents: 0, roomsRequired: 0 };
 window.isSavingData = false;
 
-const YEAR_SUBJECTS = {
+// Exposed on window so subjects-admin.js can patch it live after a save.
+window.YEAR_SUBJECTS = {
     '1st Year': {
         CSE: { 'Semester 1': ['Matrices and Calculus', 'Engineering Chemistry', 'English for Skill Enhancement', 'Electronic Devices and Circuits', 'Programming for Problem Solving'],
                 'Semester 2': ['Ordinary Differential Equations and Vector Calculus', 'Advanced Engineering Physics', 'Engineering Drawing and Computer Aided Drafting', 'Basic Electrical Engineering', 'Data Structures'] },
@@ -132,8 +133,9 @@ function getYearSuffix(year) {
 }
 
 function getPhysicalSectionRoomName(year, sectionName) {
-    const [branch, section] = sectionName.split('-');
-    return `${branch} ${section}${getYearSuffix(year)}`;
+    // With the real room database, there is no fixed section→room mapping.
+    // Return null; auto-assign will simply pick from available rooms in order.
+    return null;
 }
 
 function selectSemester(semester) {
@@ -231,8 +233,12 @@ function updateSubjects(year) {
     const container = document.getElementById(`subjects-${year.replace(/\s/g, '-')}`);
     container.innerHTML = '';
 
+    // Use the live YEAR_SUBJECTS (which subjects-admin.js patches after every save,
+    // and which is pre-populated from Firestore at page load via loadSubjectsFromFirestore).
     yearData[year].branches.forEach(branch => {
-        const subjects = YEAR_SUBJECTS[year][branch][selectedSemester] || [];
+        const subjects = (YEAR_SUBJECTS[year] && YEAR_SUBJECTS[year][branch] && YEAR_SUBJECTS[year][branch][selectedSemester])
+            ? YEAR_SUBJECTS[year][branch][selectedSemester]
+            : [];
         const div = document.createElement('div');
         div.className = 'form-group';
         div.innerHTML = `
@@ -340,6 +346,9 @@ async function refreshOccupiedRoomsForSelectedSlot() {
 }
 
 async function purgeExpiredTables() {
+    // Auto-deletion of past tables is disabled — admins manage table lifecycle manually.
+    return;
+    /* original logic kept for reference:
     const todayISO = toLocalISODate();
     const snapshot = await db.collection('examTables').get();
     const deletePromises = [];
@@ -354,6 +363,7 @@ async function purgeExpiredTables() {
     if (deletePromises.length > 0) {
         await Promise.all(deletePromises);
     }
+    */
 }
 
 function getTableDisplayName(table) {
@@ -478,25 +488,16 @@ async function calculateRoomRequirements() {
 }
 
 function getAllAvailableRooms() {
-    const rooms = [];
-    const branches = ['CSE', 'ECE', 'AIML', 'EEE'];
-    const sections = {
-        CSE: ['A', 'B', 'C', 'D', 'E', 'F'],
-        ECE: ['A', 'B'],
-        AIML: ['A', 'B'],
-        EEE: ['A']
-    };
-
-    for (let year = 1; year <= 4; year++) {
-        branches.forEach(branch => {
-            sections[branch].forEach(section => {
-                rooms.push(`${branch} ${section}${year}`);
-            });
-        });
+    // Delegates to rooms-data.js cache (loaded on page init via loadRoomsFromFirestore())
+    if (typeof window.getAllAvailableRooms_rooms !== 'undefined') {
+        return window.getAllAvailableRooms_rooms();
     }
-
-    rooms.push('BSFI-1', 'BSFI-2', 'SMB (Seminar Hall-1)', 'SMB (Seminar Hall-2)', 'SMB (Seminar Hall-3)', 'SMB (Seminar Hall-4)');
-    return rooms;
+    // Fallback: return from roomsCache directly (rooms-data.js is loaded)
+    if (typeof roomsCache !== 'undefined' && roomsCache.length > 0) {
+        return roomsCache.map(r => r.name);
+    }
+    // Last-resort fallback — empty (rooms not yet loaded)
+    return [];
 }
 
 function showInsufficientRoomsMessage(required, available) {
@@ -511,63 +512,32 @@ function showInsufficientRoomsMessage(required, available) {
 async function startAutoAssign(roomsRequired) {
     await refreshOccupiedRoomsForSelectedSlot();
     selectedRooms.clear();
-    const preferredSectionRooms = [];
-    const populatedSections = new Set(buildStudentAndSectionData().allSections.map(section =>
-        `${section.year}|${section.name}`
-    ));
 
-    selectedYears.forEach(year => {
-        const data = yearData[year];
-        data.branches.forEach(branch => {
-            branchData[branch].sections.forEach(sectionName => {
-                if (populatedSections.has(`${year}|${sectionName}`)) {
-                    preferredSectionRooms.push(getPhysicalSectionRoomName(year, sectionName));
-                }
-            });
-        });
-    });
+    // Pick the first roomsRequired free rooms from the live room list
+    const freeRooms = getAllAvailableRooms()
+        .filter(room => !occupiedRoomsForSelectedSlot.has(room));
 
-    const freePreferredRooms = [...new Set(preferredSectionRooms)]
-        .filter(room => !occupiedRoomsForSelectedSlot.has(room))
-        .slice(0, roomsRequired);
-    const occupiedPreferredRooms = preferredSectionRooms.filter(room => occupiedRoomsForSelectedSlot.has(room));
-
-    freePreferredRooms.forEach(room => selectedRooms.add(room));
-
-    const sectionRoomCapacity = selectedRooms.size * 28;
-    const remainingBenches = Math.max(0, roomRequirementContext.requiredBenches - sectionRoomCapacity);
-    const additionalRoomsNeeded = Math.max(0, roomsRequired - selectedRooms.size);
+    const autoSelected = freeRooms.slice(0, roomsRequired);
+    autoSelected.forEach(room => selectedRooms.add(room));
 
     const container = document.getElementById('roomSelectionDisplay');
     container.innerHTML = `
-        <h4 style="margin-top: 20px; color: #4caf50;">✨ Auto Assign - Section Rooms:</h4>
+        <h4 style="margin-top: 20px; color: #4caf50;">✨ Auto Assign - Rooms:</h4>
         <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 10px 0;">
-            <p style="margin: 5px 0;"><strong>🏫 Section Rooms Auto-Allocated:</strong> ${selectedRooms.size} room(s)</p>
-            <p style="margin: 5px 0;"><strong>🪑 Bench capacity:</strong> ${sectionRoomCapacity} benches</p>
+            <p style="margin: 5px 0;"><strong>🏫 Rooms Auto-Allocated:</strong> ${selectedRooms.size} room(s)</p>
             <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
                 ${Array.from(selectedRooms).map(room => `<span style="padding: 5px 10px; background: white; border-radius: 4px; border: 2px solid #4caf50;">${room}</span>`).join('')}
             </div>
         </div>
     `;
 
-    if (occupiedPreferredRooms.length > 0) {
-        container.innerHTML += `
-            <div style="background: #fff5f5; padding: 15px; border-radius: 8px; margin: 10px 0; border: 2px solid #f56565;">
-                <p style="margin: 0 0 10px 0; color: #c53030; font-weight: 700;">Already allotted for the same date and time</p>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                    ${occupiedPreferredRooms.map(room => `<span style="padding: 5px 10px; background: white; border-radius: 4px; border: 2px solid #f56565; color: #c53030;">${room}</span>`).join('')}
-                </div>
-            </div>
-        `;
-    }
-
+    const additionalRoomsNeeded = roomsRequired - selectedRooms.size;
     if (additionalRoomsNeeded > 0) {
-        const extraFreeRooms = getAllAvailableRooms().filter(room => !occupiedRoomsForSelectedSlot.has(room) && !selectedRooms.has(room));
+        const extraFreeRooms = freeRooms.filter(room => !selectedRooms.has(room));
         container.innerHTML += `
             <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0; border: 2px solid #ffc107;">
-                <p style="margin: 5px 0; color: #856404;"><strong>⚠️ Additional Rooms Needed:</strong> ${additionalRoomsNeeded} room(s)</p>
-                <p style="margin: 5px 0; color: #856404;"><strong>🪑 Remaining benches:</strong> ${remainingBenches}</p>
-                <p style="margin: 5px 0; color: #856404;"><strong>Available Extra Rooms:</strong> ${extraFreeRooms.length}</p>
+                <p style="margin: 5px 0; color: #856404;"><strong>⚠️ Not enough free rooms.</strong> Need ${roomsRequired}, found ${selectedRooms.size}.</p>
+                <p style="margin: 5px 0; color: #856404;">Available: ${extraFreeRooms.length} remaining unoccupied rooms.</p>
                 <button onclick="selectAdditionalRooms(${additionalRoomsNeeded})" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px;">
                     📍 Select ${additionalRoomsNeeded} Additional Room(s)
                 </button>
@@ -840,47 +810,76 @@ function generateMultiYearArrangement() {
     sessionStorage.setItem('tableMetadata', JSON.stringify(tableMetadata));
     localStorage.setItem('tableMetadata', JSON.stringify(tableMetadata));
 
-    // Assign invigilators and then navigate
-    assignInvigilatorsToRooms(Array.from(selectedRooms), examDate, examTime).then(roomInvigilators => {
-        sessionStorage.setItem('roomInvigilators', JSON.stringify(roomInvigilators));
-        window.location.href = 'results.html';
-    });
+    // Navigate to results — invigilator assignment happens there on demand
+    sessionStorage.setItem('roomInvigilators', JSON.stringify({}));
+    window.location.href = 'results.html';
 }
 
 async function assignInvigilatorsToRooms(rooms, examDateISO, examTime) {
     try {
-        // Determine slot: FN = before 1pm, AN = afternoon
         const slot = examTime < '13:00' ? 'FN' : 'AN';
+        function normSlot(s) {
+            const u = String(s||'').toUpperCase().replace(/[^A-Z]/g,'');
+            if (u.startsWith('A')) return 'AN';
+            if (u.startsWith('F')) return 'FN';
+            return u.substring(0,2) || 'FN';
+        }
 
         const snapshot = await db.collection('invigilators')
             .where('date', '==', examDateISO)
-            .where('slot', '==', slot)
-            .where('assigned', '==', false)
             .get();
 
-        const available = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const available = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(inv => normSlot(inv.slot) === slot);
 
-        // Shuffle available invigilators randomly
+        // Shuffle
         for (let i = available.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [available[i], available[j]] = [available[j], available[i]];
         }
 
+        // Fetch subject constraints
+        let facultySubjectsMap = new Map();
+        if (typeof window.fetchFacultySubjectsMap === 'function') {
+            facultySubjectsMap = await window.fetchFacultySubjectsMap();
+        }
+
+        const seatingData = JSON.parse(sessionStorage.getItem('seatingData') || '[]');
+        const roomSubjects = {};
+        seatingData.forEach(row => {
+            if (!row.classroom) return;
+            if (!roomSubjects[row.classroom]) roomSubjects[row.classroom] = new Set();
+            if (row.seat1?.subject) roomSubjects[row.classroom].add(row.seat1.subject.trim().toLowerCase());
+            if (row.seat2?.subject) roomSubjects[row.classroom].add(row.seat2.subject.trim().toLowerCase());
+        });
+
+        function canAssign(facultyName, room) {
+            const taughtSubjects = facultySubjectsMap.get(facultyName);
+            if (!taughtSubjects || taughtSubjects.size === 0) return true;
+            const examSubjects = roomSubjects[room] || new Set();
+            for (const subject of examSubjects) {
+                if (taughtSubjects.has(subject)) return false;
+            }
+            return true;
+        }
+
         const roomInvigilators = {};
-        const batch = db.batch();
-        let pointer = 0;
+        const usedIds = new Set();
 
         rooms.forEach(room => {
             const assigned = [];
-            // Assign up to 2 invigilators per room
-            for (let n = 0; n < 2 && pointer < available.length; n++, pointer++) {
-                assigned.push(available[pointer].name);
-                batch.update(db.collection('invigilators').doc(available[pointer].id), { assigned: true });
+            for (const invig of available) {
+                if (assigned.length >= 2) break;
+                if (usedIds.has(invig.id)) continue;
+                if (!canAssign(invig.name, room)) continue;
+                assigned.push(invig.name);
+                usedIds.add(invig.id);
             }
             roomInvigilators[room] = assigned;
         });
 
-        if (pointer > 0) await batch.commit();
+        // No assigned:true writes — records stay reusable
         return roomInvigilators;
     } catch(err) {
         console.error('Error assigning invigilators:', err);
@@ -1074,12 +1073,17 @@ async function loadAllTables(selectedTableId = null) {
             card.id = `table-card-${table.id}`;
             card.style.cssText = `background: white; margin: 10px 0; border-radius: 8px; border: 2px solid ${isSelected ? '#4a90e2' : '#e0e0e0'}; overflow: hidden;`;
 
+            const yearsStr   = Array.isArray(table.years) ? table.years.join(', ') : (table.year || '—');
+            const semStr     = table.semester || '—';
+            const dateStr    = table.examDate || table.examDateISO || '—';
+            const timeStr    = table.examTime || '—';
+
             card.innerHTML = `
                 <div onclick="toggleTableExpand('${table.id}')" style="padding: 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h3 style="margin: 0 0 8px 0;">${getTableDisplayName(table)}</h3>
-                        <p style="margin: 3px 0;"><strong>Semester:</strong> ${table.semester} &nbsp;|&nbsp; <strong>Years:</strong> ${table.years.join(', ')}</p>
-                        <p style="margin: 3px 0;"><strong>Date:</strong> ${table.examDate} &nbsp;|&nbsp; <strong>Time:</strong> ${table.examTime} &nbsp;|&nbsp; <strong>Rooms:</strong> ${selectedRoomCount}</p>
+                        <p style="margin: 3px 0;"><strong>Semester:</strong> ${semStr} &nbsp;|&nbsp; <strong>Years:</strong> ${yearsStr}</p>
+                        <p style="margin: 3px 0;"><strong>Date:</strong> ${dateStr} &nbsp;|&nbsp; <strong>Time:</strong> ${timeStr} &nbsp;|&nbsp; <strong>Rooms:</strong> ${selectedRoomCount}</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span id="chevron-${table.id}" style="font-size: 20px; transition: transform 0.2s;">${isSelected ? '▲' : '▼'}</span>
@@ -1092,7 +1096,6 @@ async function loadAllTables(selectedTableId = null) {
             `;
             container.appendChild(card);
 
-            // If this card is pre-selected, render its content immediately
             if (isSelected) {
                 renderTableContent(table);
             }
@@ -1101,7 +1104,7 @@ async function loadAllTables(selectedTableId = null) {
         await loadTablesSidebar(selectedTableId);
     } catch (error) {
         console.error('Error loading tables:', error);
-        container.innerHTML = '<p style="color: red;">Error loading tables</p>';
+        container.innerHTML = `<p style="color: red;">Error loading tables: ${error.message}</p>`;
     }
 }
 
@@ -1190,10 +1193,18 @@ function renderTableContent(table) {
     });
 
     // Prepend the Download Seating Plan button
-    const btnBar = `<div style="margin-bottom:16px;">
+    const btnBar = `<div style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
         <button onclick="exportSeatingPlanCSV(window.__tableCache_${table.id})"
                 style="background:#1d6f42;color:white;padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">
             📄 Download Seating Plan (PDF)
+        </button>
+        <button onclick="exportTablePDFFromAdmin(window.__tableCache_${table.id})"
+                style="background:#0369a1;color:white;padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">
+            📋 Export Table
+        </button>
+        <button onclick="exportInvigilatorTablePDFFromAdmin(window.__tableCache_${table.id})"
+                style="background:#0e7490;color:white;padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;">
+            🧾 Export Invigilator Table
         </button>
     </div>`;
 
@@ -1467,3 +1478,216 @@ function exportSeatingPlanCSV(table) {
     doc.save(`SeatingPlan_${safeName}.pdf`);
 }
 
+
+// ─── Export Table PDF from All Tables panel ───────────────────────────────────
+// Uses the exact same format as the "Export Table" button on the results page.
+function exportTablePDFFromAdmin(table) {
+    if (!table) return;
+    const seatingData = table.seatingData || [];
+    const rooms = Array.isArray(table.selectedRooms) && table.selectedRooms.length
+        ? table.selectedRooms
+        : [...new Set(seatingData.map(r => r.classroom).filter(Boolean))];
+    // Build a meta object matching what _doExportTablePDF expects
+    const meta = {
+        examTime:    table.examTime    || '',
+        examEndTime: table.examEndTime || '',
+        years:       table.years       || [],
+        semester:    table.semester    || '',
+        yearData:    table.yearData    || null,
+        examDate:    table.examDate    || table.examDateISO || '',
+        examDateISO: table.examDateISO || table.examDate    || '',
+        selectedRooms: rooms,
+    };
+
+    const { jsPDF } = window.jspdf;
+
+    const fmtTime = t => {
+        if (!t) return '';
+        const [h, m] = t.split(':');
+        const hr = parseInt(h);
+        return `${hr % 12 || 12}.${m} ${hr < 12 ? 'am' : 'pm'}`;
+    };
+    const yearMap = {'1st Year':'I','2nd Year':'II','3rd Year':'III','4th Year':'IV'};
+
+    const examTime    = meta.examTime;
+    const examEndTime = meta.examEndTime;
+    const isFN        = examTime < '13:00';
+    const slotLabel   = isFN ? 'Forenoon' : 'Afternoon';
+    const timeStr     = examTime ? `${slotLabel}: ${fmtTime(examTime)} to ${fmtTime(examEndTime)}` : slotLabel;
+
+    const years   = Array.isArray(meta.years) ? meta.years : [];
+    const yearStr = years.map(y => yearMap[y] || y).join(' & ');
+    const semNum  = parseInt(((meta.semester || '').match(/(\d+)/) || [])[1]) || 0;
+    const semRoman = ['','I','II','III','IV'][semNum] || '';
+
+    let midLabel = '';
+    if (meta.yearData) {
+        const mids = [...new Set(Object.values(meta.yearData).map(d => d.mid || ''))].filter(Boolean);
+        if (mids.length) {
+            const raw = mids[0];
+            if (/sem/i.test(raw)) midLabel = 'End Examinations';
+            else { const mn = (raw.match(/\d+/)||[])[0]; midLabel = `Mid-${['','I','II','III'][parseInt(mn)]||mn} Examinations`; }
+        }
+    }
+
+    const iso = meta.examDate || meta.examDateISO || '';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthYear = /^\d{4}-\d{2}/.test(iso) ? `${months[parseInt(iso.split('-')[1])-1]}/${iso.split('-')[0]}` : '';
+    const dateDisplay = iso ? iso.split('-').reverse().join('-') : '';
+
+    const line2 = [[yearStr?`${yearStr} B.Tech`:'', semRoman?`${semRoman} SEM`:'', midLabel, monthYear?`${monthYear}`:''].filter(Boolean).join(' ')].join('');
+
+    const ROWS_PER_COL = 14;
+    const COLS_PER_ROOM = 2;
+
+    const roomData = rooms.map(room => {
+        const seats = seatingData.filter(r => r.classroom === room);
+        const rolls = [];
+        seats.forEach(b => {
+            if (b.seat1 && b.seat1.rollNo) rolls.push(b.seat1.rollNo);
+            if (b.seat2 && b.seat2.rollNo) rolls.push(b.seat2.rollNo);
+        });
+        return { room, rolls };
+    });
+
+    const PAGE_W    = 297;
+    const PAGE_H    = 210;
+    const M         = 5;
+    const HEADER_H  = 21;
+    const ROW_H     = 4.6;
+    const HEAD_H    = 5.0;
+    const FONT_SZ   = 5.0;
+    const CONTENT_W = PAGE_W - 2 * M;
+    const CONTENT_H = PAGE_H - M - HEADER_H - M;
+
+    const MIN_SUBCOL   = 12.5;
+    const MAX_ROOMS_ACROSS = Math.floor(CONTENT_W / (MIN_SUBCOL * COLS_PER_ROOM));
+    const BAND_H = HEAD_H + ROWS_PER_COL * ROW_H;
+    const MAX_BANDS = Math.floor(CONTENT_H / BAND_H);
+
+    const bandsNeeded = Math.ceil(roomData.length / MAX_ROOMS_ACROSS);
+    const roomsAcross = bandsNeeded <= MAX_BANDS
+        ? Math.ceil(roomData.length / bandsNeeded)
+        : MAX_ROOMS_ACROSS;
+
+    const doc = new jsPDF('l', 'mm', 'a4');
+    doc.setLineWidth(0.3);
+    doc.setTextColor(0);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('BVRIT HYDERABAD College of Engineering for Women', PAGE_W/2, M+5, {align:'center'});
+    doc.setFontSize(9);
+    doc.text(line2, PAGE_W/2, M+11, {align:'center'});
+    doc.setFontSize(10);
+    doc.text(dateDisplay ? `${dateDisplay} ${isFN?'FN':'AN'}` : (isFN?'FN':'AN'),
+             PAGE_W * 0.25, M+17.5, {align:'center'});
+    doc.text(timeStr, PAGE_W * 0.72, M+17.5, {align:'center'});
+    doc.setDrawColor(0);
+    doc.line(M, M+19.5, PAGE_W-M, M+19.5);
+
+    let bandY = M + HEADER_H;
+    let pageRoomIdx = 0;
+
+    while (pageRoomIdx < roomData.length) {
+        const bandRooms = roomData.slice(pageRoomIdx, pageRoomIdx + roomsAcross);
+        const bandCount = bandRooms.length;
+        const roomBlockW = CONTENT_W / bandCount;
+        const subColW    = roomBlockW / COLS_PER_ROOM;
+
+        if (bandY + BAND_H > PAGE_H - M + 1) {
+            doc.addPage();
+            bandY = M;
+        }
+
+        bandRooms.forEach((rd, ri) => {
+            const x = M + ri * roomBlockW;
+
+            doc.setFillColor(210, 210, 210);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(6.5);
+            doc.rect(x, bandY, roomBlockW, HEAD_H, 'FD');
+            doc.setTextColor(0);
+            doc.text(rd.room, x + roomBlockW/2, bandY + HEAD_H - 1.2, {align:'center'});
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(FONT_SZ);
+
+            for (let col = 0; col < COLS_PER_ROOM; col++) {
+                for (let row = 0; row < ROWS_PER_COL; row++) {
+                    const rollIdx = col * ROWS_PER_COL + row;
+                    const roll    = rd.rolls[rollIdx] || '';
+                    const cx      = x + col * subColW;
+                    const ry      = bandY + HEAD_H + row * ROW_H;
+
+                    if (row % 2 === 0) { doc.setFillColor(248,248,248); doc.rect(cx, ry, subColW, ROW_H, 'F'); }
+                    doc.setDrawColor(160,160,160);
+                    doc.rect(cx, ry, subColW, ROW_H);
+                    if (roll) {
+                        doc.setTextColor(0);
+                        doc.text(roll, cx + 1, ry + ROW_H - 1.2);
+                    }
+                }
+            }
+
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.5);
+            doc.rect(x, bandY, roomBlockW, HEAD_H + ROWS_PER_COL * ROW_H);
+            doc.setLineWidth(0.3);
+        });
+
+        bandY += BAND_H + 2;
+        pageRoomIdx += roomsAcross;
+    }
+
+    doc.save(`seating-table-${iso || 'export'}.pdf`);
+}
+
+// ─── Export Invigilator Table PDF from All Tables panel ───────────────────────
+function exportInvigilatorTablePDFFromAdmin(table) {
+    if (!table) return;
+    const { jsPDF } = window.jspdf;
+
+    const seatingData = table.seatingData || [];
+    const rooms = Array.isArray(table.selectedRooms) && table.selectedRooms.length
+        ? table.selectedRooms
+        : [...new Set(seatingData.map(r => r.classroom).filter(Boolean))];
+
+    const roomInvigilators = table.roomInvigilators || {};
+
+    const rows = rooms.map(room => [
+        room,
+        (roomInvigilators[room] || []).join(', ') || '—'
+    ]);
+
+    const iso = table.examDate || table.examDateISO || '';
+    const dateDisplay = iso ? iso.split('-').reverse().join('-') : '';
+    const examTime = table.examTime || '';
+    const slot = examTime && examTime < '13:00' ? 'FN' : 'AN';
+
+    const doc = new jsPDF('p', 'mm', 'a4');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('BVRIT HYDERABAD College of Engineering for Women', 105, 14, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Invigilator Assignment Table', 105, 21, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    if (dateDisplay) doc.text(`Date: ${dateDisplay}   Slot: ${slot}`, 105, 28, { align: 'center' });
+
+    doc.autoTable({
+        head: [['Room', 'Invigilator(s)']],
+        body: rows,
+        startY: 33,
+        styles: { fontSize: 10, cellPadding: 5 },
+        headStyles: { fillColor: [74, 144, 226], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        columnStyles: {
+            0: { cellWidth: 45, fontStyle: 'bold' },
+            1: { cellWidth: 'auto' }
+        },
+        margin: { left: 14, right: 14 }
+    });
+
+    doc.save(`invigilators-${iso || 'table'}.pdf`);
+}

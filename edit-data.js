@@ -1148,8 +1148,10 @@ function initInvigilatorView() {
             </div>
         </div>
         <div id="invigilatorListContainer"></div>
+        ${renderFacultySubjectsSection()}
     `;
     loadInvigilatorList();
+    loadFacultySubjectsList();
 }
 
 async function handleInvigilatorUpload(event) {
@@ -1192,7 +1194,12 @@ async function handleInvigilatorUpload(event) {
                     if (dateMatch) {
                         const [dd, mm, yyyy] = dateMatch[1].split('-');
                         const isoDate = `${yyyy}-${mm}-${dd}`;
-                        const slot = String(slotRow[colIdx]||'').trim().toUpperCase() || 'FN';
+                        const rawSlot = String(slotRow[colIdx]||'').trim().toUpperCase();
+                        // Normalise: FN/FORENOON/F.N → 'FN', AN/AFTERNOON/A.N → 'AN'
+                        let slot = 'FN';
+                        if (/^A\.?N$|^AFTER/i.test(rawSlot)) slot = 'AN';
+                        else if (/^F\.?N$|^FORE/i.test(rawSlot)) slot = 'FN';
+                        else if (rawSlot) slot = rawSlot.replace(/[^A-Z]/g,'').substring(0,2) || 'FN';
                         dateCols.push({ colIdx, date: isoDate, slot });
                     }
                 });
@@ -1305,3 +1312,168 @@ async function clearInvigilatorsByDept(dept) {
         alert('Error: ' + err.message);
     }
 }
+
+
+// ─── Faculty Subjects ─────────────────────────────────────────────────────────
+// Separate section in the Invigilators view for uploading a faculty→subjects CSV.
+// CSV format: Teacher Name,Subject  (one row per teacher-subject pair)
+// Stored in Firestore collection 'facultySubjects' as:
+//   { name: string, subjects: string[], updatedAt: string }
+
+function renderFacultySubjectsSection() {
+    return `
+    <div style="background:white;border:2px solid #e0e0e0;border-radius:8px;padding:20px;margin-top:24px;">
+        <div style="margin-bottom:14px;">
+            <strong style="font-size:15px;">📚 Faculty Subjects</strong>
+            <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">
+                Upload a CSV that maps each teacher to the subjects they teach.
+                Format: <code>Teacher Name,Subject</code> — one row per teacher-subject pair.
+                Used to apply the subject constraint when assigning invigilators.
+            </p>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+            <label for="facultySubjectsUploadInput" class="ed-btn ed-btn-blue" style="cursor:pointer;">↑ Upload Faculty Subjects CSV</label>
+            <input type="file" id="facultySubjectsUploadInput" accept=".csv" style="display:none;" onchange="handleFacultySubjectsUpload(event)">
+            <span id="facultySubjectsUploadStatus" style="font-size:13px;color:#6b7280;"></span>
+        </div>
+        <div id="facultySubjectsListContainer">
+            <p style="color:#9ca3af;font-size:13px;">Loading...</p>
+        </div>
+    </div>`;
+}
+
+async function handleFacultySubjectsUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('facultySubjectsUploadStatus');
+    statusEl.textContent = '⏳ Parsing...';
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const text = e.target.result;
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            if (lines.length < 2) throw new Error('File is empty or has no data rows.');
+
+            // Detect header: skip if first line looks like a header
+            const firstCells = lines[0].split(',').map(c => c.trim().toLowerCase());
+            const startIdx = (firstCells[0].includes('teacher') || firstCells[0].includes('name') || firstCells[0].includes('faculty')) ? 1 : 0;
+
+            // Build map: name → Set of subjects
+            const subjectMap = new Map();
+            for (let i = startIdx; i < lines.length; i++) {
+                const parts = lines[i].split(',');
+                if (parts.length < 2) continue;
+                const name = parts[0].trim();
+                const subject = parts.slice(1).join(',').trim();
+                if (!name || !subject) continue;
+                if (!subjectMap.has(name)) subjectMap.set(name, new Set());
+                subjectMap.get(name).add(subject);
+            }
+
+            if (subjectMap.size === 0) throw new Error('No valid rows found. Check the CSV format.');
+
+            // Save to Firestore — upsert by teacher name
+            const collection = db.collection('facultySubjects');
+            const batch = db.batch();
+
+            // Delete old records for these teachers first
+            const existingSnap = await collection.get();
+            existingSnap.docs.forEach(doc => {
+                if (subjectMap.has(doc.data().name)) batch.delete(doc.ref);
+            });
+
+            subjectMap.forEach((subjectsSet, name) => {
+                const docId = name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 80);
+                batch.set(collection.doc(docId), {
+                    name,
+                    subjects: Array.from(subjectsSet),
+                    updatedAt: new Date().toISOString()
+                });
+            });
+
+            await batch.commit();
+            statusEl.textContent = `✅ Saved ${subjectMap.size} faculty records.`;
+            event.target.value = '';
+            loadFacultySubjectsList();
+        } catch(err) {
+            statusEl.textContent = '❌ ' + err.message;
+        }
+    };
+    reader.readAsText(file);
+}
+
+async function loadFacultySubjectsList() {
+    const container = document.getElementById('facultySubjectsListContainer');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#9ca3af;font-size:13px;">Loading...</p>';
+
+    try {
+        const snapshot = await db.collection('facultySubjects').orderBy('name').get();
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="color:#9ca3af;font-size:13px;">No faculty subjects uploaded yet.</p>';
+            return;
+        }
+
+        let html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:13px;color:#6b7280;">${snapshot.size} faculty members loaded</span>
+            <button onclick="clearAllFacultySubjects()" class="ed-btn ed-btn-danger-outline ed-btn-sm">Clear All</button>
+        </div>
+        <div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;">
+        <table class="ed-table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Faculty Name</th>
+                    <th>Subjects</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        snapshot.docs.forEach((doc, idx) => {
+            const d = doc.data();
+            html += `<tr>
+                <td style="color:#9ca3af;">${idx + 1}</td>
+                <td style="font-weight:600;">${escapeEditHTML(d.name)}</td>
+                <td style="font-size:13px;color:#374151;">${(d.subjects || []).map(s => `<span style="display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 7px;margin:2px 2px 2px 0;font-size:12px;">${escapeEditHTML(s)}</span>`).join('')}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    } catch(err) {
+        container.innerHTML = `<p style="color:red;">Error loading: ${err.message}</p>`;
+    }
+}
+
+async function clearAllFacultySubjects() {
+    if (!confirm('Remove all faculty subject records? This will disable the subject constraint for invigilator assignment.')) return;
+    try {
+        const snapshot = await db.collection('facultySubjects').get();
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        document.getElementById('facultySubjectsUploadStatus').textContent = '';
+        loadFacultySubjectsList();
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Expose a helper so app-multiyear.js can fetch faculty subjects for constraint checks
+window.fetchFacultySubjectsMap = async function() {
+    try {
+        const snapshot = await db.collection('facultySubjects').get();
+        // Returns Map<name, Set<subject>>
+        const map = new Map();
+        snapshot.docs.forEach(doc => {
+            const d = doc.data();
+            map.set(d.name, new Set((d.subjects || []).map(s => s.trim().toLowerCase())));
+        });
+        return map;
+    } catch(err) {
+        console.warn('Could not fetch faculty subjects:', err);
+        return new Map();
+    }
+};

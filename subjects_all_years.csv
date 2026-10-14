@@ -1,0 +1,149 @@
+Year,Branch,Semester,Subject
+1st Year,CSE,Semester 1,Matrices and Calculus
+1st Year,CSE,Semester 1,Engineering Chemistry
+1st Year,CSE,Semester 1,English for Skill Enhancement
+1st Year,CSE,Semester 1,Electronic Devices and Circuits
+1st Year,CSE,Semester 1,Programming for Problem Solving
+1st Year,CSE,Semester 2,Ordinary Differential Equations and Vector Calculus
+1st Year,CSE,Semester 2,Advanced Engineering Physics
+1st Year,CSE,Semester 2,Engineering Drawing and Computer Aided Drafting
+1st Year,CSE,Semester 2,Basic Electrical Engineering
+1st Year,CSE,Semester 2,Data Structures
+1st Year,ECE,Semester 1,Matrices and Calculus
+1st Year,ECE,Semester 1,Programming for Problem Solving
+1st Year,ECE,Semester 1,English for Skill Enhancement
+1st Year,ECE,Semester 1,Advanced Engineering Physics
+1st Year,ECE,Semester 1,Engineering Drawing and Computer Aided Drafting
+1st Year,ECE,Semester 2,Ordinary Differential Equations and Vector Calculus
+1st Year,ECE,Semester 2,Engineering Chemistry
+1st Year,ECE,Semester 2,Network Analysis and Synthesis
+1st Year,ECE,Semester 2,Python Programming
+1st Year,ECE,Semester 2,Electronic Devices and Circuits
+1st Year,AIML,Semester 1,Matrices and Calculus
+1st Year,AIML,Semester 1,Advanced Engineering Physics
+1st Year,AIML,Semester 1,Programming for Problem Solving
+1st Year,AIML,Semester 1,Engineering Drawing and Computer Aided Drafting
+1st Year,AIML,Semester 1,Basic Electrical Engineering
+1st Year,AIML,Semester 2,Ordinary Differential Equations and Vector Calculus
+1st Year,AIML,Semester 2,Engineering Chemistry
+1st Year,AIML,Semester 2,English for Skill Enhancement
+1st Year,AIML,Semester 2,Fundamentals of Electronics Engineering
+1st Year,AIML,Semester 2,Data Structures
+1st Year,EEE,Semester 1,Matrices and Calculus
+1st Year,EEE,Semester 1,Engineering Chemistry
+1st Year,EEE,Semester 1,C and Data Structures
+1st Year,EEE,Semester 1,Analog Electronics
+1st Year,EEE,Semester 1,Electrical Circuits - I
+1st Year,EEE,Semester 2,Ordinary Differential Equations and Vector Calculus
+1st Year,EEE,Semester 2,Applied Physics
+1st Year,EEE,Semester 2,Electromagnetic Fields
+1st Year,EEE,Semester 2,Computer Aided Engineering Graphics
+1st Year,EEE,Semester 2,Electrical Circuits - II
+2nd Year,CSE,Semester 1,Discrete Mathematics
+2nd Year,CSE,Semester 1,Computer Organization and Architecture
+2nd Year,CSE,Semester 1,Object Oriented Programming through Java
+2nd Year,CSE,Semester 1,Software Engineering
+2nd Year,CSE,Semester 1,Database Management Systems
+2nd Year,CSE,Semester 2,Computer Oriented Statistical Methods
+2nd Year,CSE,Semester 2,Operating Systems
+2nd Year,CSE,Semester 2,Algorithm Design and Analysis
+2nd Year,CSE,Semester 2,Computer Networks
+2nd Year,CSE,Semester 2,Machine Learning
+2nd Year,ECE,Semester 1,Signals and Systems
+2nd Year,ECE,Semester 1,Digital Logic Design
+2nd Year,ECE,Semester 1,Control Systems
+2nd Year,ECE,Semester 1,Data Structures
+2nd Year,ECE,Semester 1,Numerical Methods and Complex Variables
+2nd Year,ECE,Semester 2,Probability Theory and Stochastic Processes
+2nd Year,ECE,Semester 2,Electromagnetic Fields and Transmission Lines
+2nd Year,ECE,Semester 2,Analog and Digital Communications
+2nd Year,ECE,Semester 2,Electronic Circuit Analysis
+2nd Year,ECE,Semester 2,Linear and Digital IC Applications
+2nd Year,AIML,Semester 1,Mathematical and Statistical Foundations
+2nd Year,AIML,Semester 1,Computer Organization and Architecture
+2nd Year,AIML,Semester 1,Object Oriented Programming through Java
+2nd Year,AIML,Semester 1,Software Engineering
+2nd Year,AIML,Semester 1,Database Management System
+2nd Year,AIML,Semester 2,Discrete Mathematics
+2nd Year,AIML,Semester 2,Operating Systems
+2nd Year,AIML,Semester 2,Algorithm Design and Analysis
+2nd Year,AIML,Semester 2,Computer Networks
+2nd Year,AIML,Semester 2,Artificial Intelligence
+2nd Year,EEE,Semester 1,Control Systems
+2nd Year,EEE,Semester 1,Electrical Machines - I
+2nd Year,EEE,Semester 1,Digital Electronics
+2nd Year,EEE,Semester 1,Power Systems - I
+2nd Year,EEE,Semester 1,Electrical Measurements and Sensors
+2nd Year,EEE,Semester 2,Numerical Methods and Complex Variables
+2nd Year,EEE,Semester 2,Electrical Machines - II
+2nd Year,EEE,Semester 2,Power Systems - II
+2nd Year,EEE,Semester 2,Power Electronics
+2nd Year,EEE,Semester 2,Microprocessors and Microcontrollers
+3rd Year,CSE,Semester 1,Automata Theory and Compiler Design
+3rd Year,CSE,Semester 1,Artificial Intelligence
+3rd Year,CSE,Semester 1,DevOps
+3rd Year,CSE,Semester 1,Professional Elective-I
+3rd Year,CSE,Semester 1,Open Elective-I
+3rd Year,CSE,Semester 2,Cryptography and Network Security
+3rd Year,CSE,Semester 2,Deep Learning
+3rd Year,CSE,Semester 2,Business Economics and Financial Analysis
+3rd Year,CSE,Semester 2,Professional Elective-II
+3rd Year,CSE,Semester 2,Open Elective-II
+3rd Year,ECE,Semester 1,Digital Signal Processing
+3rd Year,ECE,Semester 1,RISC and Microcontroller Architectures
+3rd Year,ECE,Semester 1,CMOS VLSI Design
+3rd Year,ECE,Semester 1,Professional Elective-I
+3rd Year,ECE,Semester 1,Open Elective-I
+3rd Year,ECE,Semester 2,Antenna Design and Wave Propagation
+3rd Year,ECE,Semester 2,IoT Architectures and Protocols
+3rd Year,ECE,Semester 2,Business Economics and Financial Analysis
+3rd Year,ECE,Semester 2,Professional Elective-II
+3rd Year,ECE,Semester 2,Open Elective-II
+3rd Year,AIML,Semester 1,Machine Learning
+3rd Year,AIML,Semester 1,Automata Theory and Compiler Design
+3rd Year,AIML,Semester 1,Data Analytics
+3rd Year,AIML,Semester 1,Professional Elective-I
+3rd Year,AIML,Semester 1,Open Elective-I
+3rd Year,AIML,Semester 2,Natural Language Processing
+3rd Year,AIML,Semester 2,Deep Learning
+3rd Year,AIML,Semester 2,Business Economics and Financial Analysis
+3rd Year,AIML,Semester 2,Professional Elective-II
+3rd Year,AIML,Semester 2,Open Elective-II
+3rd Year,EEE,Semester 1,Power Semiconductor Drives
+3rd Year,EEE,Semester 1,Power System Protection
+3rd Year,EEE,Semester 1,Power Electronics for Renewable Energy Systems
+3rd Year,EEE,Semester 1,Professional Elective-I
+3rd Year,EEE,Semester 1,Open Elective-I
+3rd Year,EEE,Semester 2,Power System Operation and Control
+3rd Year,EEE,Semester 2,Hybrid Electric Vehicles
+3rd Year,EEE,Semester 2,Fundamentals of Management
+3rd Year,EEE,Semester 2,Professional Elective-II
+3rd Year,EEE,Semester 2,Open Elective-II
+4th Year,CSE,Semester 1,Natural Language Processing
+4th Year,CSE,Semester 1,Cyber Security
+4th Year,CSE,Semester 1,Fundamentals of Management
+4th Year,CSE,Semester 1,Professional Elective-III
+4th Year,CSE,Semester 1,Professional Elective-IV
+4th Year,CSE,Semester 2,Professional Elective-V
+4th Year,CSE,Semester 2,Professional Elective-VI
+4th Year,ECE,Semester 1,Microwave and Optical Communications
+4th Year,ECE,Semester 1,Embedded System Design
+4th Year,ECE,Semester 1,Fundamentals of Management for Engineers
+4th Year,ECE,Semester 1,Professional Elective-III
+4th Year,ECE,Semester 1,Professional Elective-IV
+4th Year,ECE,Semester 2,Professional Elective-V
+4th Year,ECE,Semester 2,Professional Elective-VI
+4th Year,AIML,Semester 1,Reinforcement Learning
+4th Year,AIML,Semester 1,Generative AI
+4th Year,AIML,Semester 1,Fundamentals of Management for Engineers
+4th Year,AIML,Semester 1,Professional Elective-III
+4th Year,AIML,Semester 1,Professional Elective-IV
+4th Year,AIML,Semester 2,Professional Elective-V
+4th Year,AIML,Semester 2,Professional Elective-VI
+4th Year,EEE,Semester 1,Smart Metering and Communication Protocols
+4th Year,EEE,Semester 1,EV Charging Infrastructure
+4th Year,EEE,Semester 1,Fundamentals of Management
+4th Year,EEE,Semester 1,Professional Elective-III
+4th Year,EEE,Semester 1,Professional Elective-IV
+4th Year,EEE,Semester 2,Professional Elective-V
+4th Year,EEE,Semester 2,Professional Elective-VI

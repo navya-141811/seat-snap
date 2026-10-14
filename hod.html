@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOD Dashboard — Seat Snap</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --blue:    #2563eb;
+            --green:   #059669;
+            --gray:    #6b7280;
+            --light:   #f1f5f9;
+            --border:  #e2e8f0;
+            --text:    #0f172a;
+            --subtext: #64748b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--light);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Top nav ── */
+        .nav {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .nav-brand .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--blue);
+        }
+        .nav-back {
+            display: flex; align-items: center; gap: 6px;
+            background: none; border: 1.5px solid var(--border);
+            color: var(--subtext); padding: 7px 16px;
+            border-radius: 8px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .nav-back:hover { border-color: var(--blue); color: var(--blue); background: #eff6ff; }
+
+        /* ── Page ── */
+        .page { max-width: 1200px; margin: 0 auto; padding: 28px 20px 48px; }
+
+        /* ── Stats row ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 22px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .stat-icon {
+            width: 44px; height: 44px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .stat-icon.blue   { background: #eff6ff; }
+        .stat-icon.green  { background: #ecfdf5; }
+        .stat-icon.purple { background: #f5f3ff; }
+        .stat-num  { font-size: 26px; font-weight: 800; line-height: 1; }
+        .stat-label{ font-size: 12px; color: var(--subtext); margin-top: 3px; font-weight: 500; }
+
+        /* ── Controls ── */
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .search-wrap {
+            flex: 1;
+            min-width: 220px;
+            position: relative;
+        }
+        .search-wrap svg {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--subtext); pointer-events: none;
+        }
+        .search-wrap input {
+            width: 100%;
+            padding: 10px 14px 10px 38px;
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            font-size: 14px;
+            outline: none;
+            background: white;
+            transition: border-color 0.15s;
+        }
+        .search-wrap input:focus { border-color: var(--blue); }
+
+        .filter-tabs {
+            display: flex; gap: 6px;
+        }
+        .ftab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            background: white;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--subtext);
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .ftab:hover { border-color: var(--blue); color: var(--blue); }
+        .ftab.active { background: var(--blue); color: white; border-color: var(--blue); }
+        .ftab.active-green { background: var(--green); color: white; border-color: var(--green); }
+
+        /* ── Table ── */
+        .table-wrap {
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+        }
+        thead th {
+            background: #f8fafc;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--subtext);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-bottom: 1.5px solid var(--border);
+        }
+        tbody tr {
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.1s;
+        }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: #f8fafc; }
+        tbody td { padding: 13px 16px; vertical-align: middle; }
+
+        .name-cell { font-weight: 600; color: var(--text); }
+        .room-chip {
+            display: inline-block;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .dept-text { color: var(--subtext); font-size: 12px; }
+        .time-text { color: var(--subtext); font-size: 12px; }
+        .exam-text { color: var(--subtext); font-size: 12px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge-live {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .badge-live::before {
+            content: '';
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            display: inline-block;
+            animation: pulse 1.4s infinite;
+        }
+        .badge-soon {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        /* ── Empty / loading ── */
+        .empty {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--subtext);
+        }
+        .empty-icon { font-size: 42px; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
+
+        .loading {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--subtext);
+            font-size: 14px;
+        }
+        .spinner {
+            width: 32px; height: 32px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 14px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result-count {
+            font-size: 12px;
+            color: var(--subtext);
+            margin-bottom: 10px;
+            padding-left: 2px;
+        }
+
+        @media (max-width: 680px) {
+            .stats { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .filter-tabs { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+    <div class="nav-brand">
+        <div class="dot"></div>
+        HOD Dashboard
+        <span style="font-size:12px;font-weight:500;color:var(--subtext);margin-left:4px;">Invigilator Overview</span>
+    </div>
+    <button class="nav-back" onclick="window.location.href='index.html'">
+        ← Back to Home
+    </button>
+</nav>
+
+<div class="page">
+
+    <!-- Stats -->
+    <div class="stats" id="statsRow" style="display:none;">
+        <div class="stat-card">
+            <div class="stat-icon blue">👩‍🏫</div>
+            <div>
+                <div class="stat-num" id="statTotal">—</div>
+                <div class="stat-label">Total assignments</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">🟢</div>
+            <div>
+                <div class="stat-num" id="statActive">—</div>
+                <div class="stat-label">Currently invigilating</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon purple">📅</div>
+            <div>
+                <div class="stat-num" id="statUpcoming">—</div>
+                <div class="stat-label">Upcoming</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="9" cy="9" r="6"/><path d="m15 15 4 4" stroke-linecap="round"/>
+            </svg>
+            <input type="search" id="hodSearch" placeholder="Search name, room, department…" oninput="applyFilters()">
+        </div>
+        <div class="filter-tabs">
+            <button class="ftab active" data-f="all"      onclick="setFilter('all',this)">All</button>
+            <button class="ftab"        data-f="active"   onclick="setFilter('active',this)">Live now</button>
+            <button class="ftab"        data-f="upcoming" onclick="setFilter('upcoming',this)">Upcoming</button>
+        </div>
+    </div>
+
+    <!-- Result count -->
+    <div class="result-count" id="resultCount"></div>
+
+    <!-- Loading -->
+    <div id="hodLoading" class="loading">
+        <div class="spinner"></div>
+        Loading invigilator assignments…
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap" id="tableWrap" style="display:none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Faculty Name</th>
+                    <th>Room</th>
+                    <th>Department</th>
+                    <th>Exam</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="hodTbody"></tbody>
+        </table>
+        <div id="hodEmpty" class="empty" style="display:none;">
+            <div class="empty-icon">🔍</div>
+            <p>No results match your search or filter.</p>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config-simple.js"></script>
+<script>
+    let allEntries = [];
+    let currentFilter = 'all';
+
+    window.onload = async function() {
+        try { await loadHodData(); }
+        catch(err) {
+            document.getElementById('hodLoading').innerHTML =
+                `<div style="color:#dc2626;">❌ Error: ${escapeHtml(err.message)}</div>`;
+        }
+    };
+
+    async function loadHodData() {
+        const now = new Date();
+        const todayISO = toLocalISO(now);
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+
+        const snap = await db.collection('examTables')
+            .where('examDateISO', '>=', todayISO).get();
+
+        allEntries = [];
+
+        snap.docs.forEach(doc => {
+            const t = doc.data();
+            const examDate = t.examDateISO || t.examDate || '';
+            const examTime = t.examTime || '10:30';
+            const examEnd  = t.examEndTime || '';
+            if (!examDate) return;
+
+            let status = 'upcoming';
+            if (examDate === todayISO) {
+                const start = toMin(examTime);
+                const end   = examEnd ? toMin(examEnd) : start + 120;
+                if (nowMin > end) { status = 'past'; }
+                else if (nowMin >= start) { status = 'active'; }
+            }
+            if (status === 'past') return;
+
+            const yearMap = {'1st Year':'I','2nd Year':'II','3rd Year':'III','4th Year':'IV'};
+            const years   = Array.isArray(t.years) ? t.years : [];
+            const yearStr = years.map(y => yearMap[y] || y).join(' & ');
+            const examLabel = [yearStr ? `${yearStr} B.Tech` : '', t.semester || ''].filter(Boolean).join(' · ');
+            const timeRange = examTime ? `${fmt(examTime)}${examEnd ? ' – ' + fmt(examEnd) : ''}` : '';
+
+            Object.entries(t.roomInvigilators || {}).forEach(([room, names]) => {
+                (names || []).forEach(name => {
+                    if (!name) return;
+                    allEntries.push({ name, room, department: '', examDate, timeRange, status, examLabel });
+                });
+            });
+        });
+
+        // Enrich with department
+        try {
+            const ds = await db.collection('invigilators').get();
+            const dm = {};
+            ds.docs.forEach(d => { if (d.data().name) dm[d.data().name] = d.data().department || ''; });
+            allEntries.forEach(e => { e.department = dm[e.name] || ''; });
+        } catch(_) {}
+
+        document.getElementById('hodLoading').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'block';
+
+        const active   = allEntries.filter(e => e.status === 'active').length;
+        const upcoming = allEntries.filter(e => e.status === 'upcoming').length;
+        document.getElementById('statTotal').textContent   = allEntries.length;
+        document.getElementById('statActive').textContent  = active;
+        document.getElementById('statUpcoming').textContent= upcoming;
+        if (allEntries.length > 0) document.getElementById('statsRow').style.display = 'grid';
+
+        applyFilters();
+    }
+
+    function setFilter(f, btn) {
+        currentFilter = f;
+        document.querySelectorAll('.ftab').forEach(b => {
+            b.classList.remove('active','active-green');
+        });
+        btn.classList.add(f === 'active' ? 'active-green' : 'active');
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const q = (document.getElementById('hodSearch').value || '').trim().toLowerCase();
+        let rows = allEntries;
+        if (currentFilter !== 'all') rows = rows.filter(e => e.status === currentFilter);
+        if (q) rows = rows.filter(e =>
+            e.name.toLowerCase().includes(q) ||
+            e.room.toLowerCase().includes(q) ||
+            (e.department || '').toLowerCase().includes(q)
+        );
+        rows.sort((a,b) => {
+            if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        const count = document.getElementById('resultCount');
+        count.textContent = rows.length > 0
+            ? `Showing ${rows.length} of ${allEntries.length} assignment${allEntries.length!==1?'s':''}`
+            : '';
+
+        const tbody = document.getElementById('hodTbody');
+        const empty = document.getElementById('hodEmpty');
+
+        if (rows.length === 0) {
+            tbody.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        tbody.innerHTML = rows.map((e, i) => {
+            const isLive = e.status === 'active';
+            const badge  = isLive
+                ? `<span class="badge badge-live">Invigilating now</span>`
+                : `<span class="badge badge-soon">Upcoming</span>`;
+            return `<tr>
+                <td style="color:var(--subtext);font-size:12px;">${i+1}</td>
+                <td class="name-cell">${escapeHtml(e.name)}</td>
+                <td><span class="room-chip">${escapeHtml(e.room)}</span></td>
+                <td class="dept-text">${escapeHtml(e.department||'—')}</td>
+                <td class="exam-text" title="${escapeHtml(e.examLabel)}">${escapeHtml(e.examLabel||'—')}</td>
+                <td class="time-text">${escapeHtml(e.timeRange||e.examDate||'—')}</td>
+                <td>${badge}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function toLocalISO(d) {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function toMin(t) { const [h,m]=(t||'0:0').split(':').map(Number); return h*60+m; }
+    function fmt(t) {
+        if (!t) return '';
+        const [h,m]=t.split(':'); const hr=parseInt(h);
+        return `${hr%12||12}:${m} ${hr<12?'AM':'PM'}`;
+    }
+    function escapeHtml(v) {
+        return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+</script>
+</body>
+</html>

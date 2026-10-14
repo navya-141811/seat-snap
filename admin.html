@@ -36,6 +36,8 @@
             <button class="sidebar-btn" onclick="showView('tables')">📋 All Tables</button>
             <button class="sidebar-btn" onclick="showView('edit')">👥 Students Data</button>
             <button class="sidebar-btn" onclick="showView('invigilators')">👩‍🏫 Invigilators</button>
+            <button class="sidebar-btn" onclick="showView('rooms')">🏫 Rooms</button>
+            <button class="sidebar-btn" onclick="showView('subjects')">📖 Subjects</button>
             <div class="sidebar-section-title">Generated Tables</div>
             <div id="sidebarTablesList" class="sidebar-tables-list"></div>
             <button class="sidebar-btn logout" onclick="logout()">🚪 Logout</button>
@@ -106,6 +108,8 @@
             </div>
             <div id="editView"></div>
             <div id="invigilatorView" style="display:none; width:100%;"></div>
+            <div id="roomsView" style="display:none; width:100%;"></div>
+            <div id="subjectsView" style="display:none; width:100%;"></div>
         </div>
     </div>
 
@@ -124,7 +128,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="app-multiyear.js?v=all-years-visible-20261002"></script>
+    <script src="rooms-data.js?v=rooms-firestore-20261014"></script>
+    <script src="rooms-admin.js?v=rooms-admin-20261014"></script>
     <script src="edit-data.js?v=invigilator-fix-20261002"></script>
+    <script src="subjects-admin.js?v=subjects-admin-20261014"></script>
     <script src="login.js"></script>
     <script>
         const adminEmail = (sessionStorage.getItem('userEmail') || '').trim().toLowerCase();
@@ -140,6 +147,23 @@
             window.studentDatabaseReady = loadStudentDatabaseOverrides()
                 .catch(error => console.error('Could not load saved student records:', error))
                 .finally(() => loadTablesSidebar());
+            // Pre-load subjects from Firestore into YEAR_SUBJECTS so dropdowns are live
+            window.loadSubjectsFromFirestore().then(firestoreSubjects => {
+                if (!firestoreSubjects) return; // empty → keep hardcoded fallback
+                // Merge into YEAR_SUBJECTS (don't replace entirely — preserves any year
+                // not yet in Firestore)
+                Object.keys(firestoreSubjects).forEach(year => {
+                    if (!YEAR_SUBJECTS[year]) YEAR_SUBJECTS[year] = {};
+                    Object.keys(firestoreSubjects[year]).forEach(branch => {
+                        if (!YEAR_SUBJECTS[year][branch]) YEAR_SUBJECTS[year][branch] = {};
+                        Object.keys(firestoreSubjects[year][branch]).forEach(sem => {
+                            YEAR_SUBJECTS[year][branch][sem] = firestoreSubjects[year][branch][sem];
+                        });
+                    });
+                });
+            }).catch(err => console.warn('Could not pre-load subjects:', err));
+            // Load Firestore room database
+            loadRoomsFromFirestore().catch(err => console.warn('Rooms load failed:', err));
         }
         
         async function showGenerateForm() {
@@ -158,6 +182,8 @@
                 document.getElementById('generateFormView').style.display = 'none';
                 document.getElementById('editView').style.display = 'none';
                 document.getElementById('invigilatorView').style.display = 'none';
+                document.getElementById('roomsView').style.display = 'none';
+                document.getElementById('subjectsView').style.display = 'none';
                 document.getElementById('allTablesView').style.display = 'block';
                 loadAllTables(selectedTableId);
             } else if (view === 'edit') {
@@ -165,6 +191,8 @@
                 document.getElementById('generateFormView').style.display = 'none';
                 document.getElementById('allTablesView').style.display = 'none';
                 document.getElementById('invigilatorView').style.display = 'none';
+                document.getElementById('roomsView').style.display = 'none';
+                document.getElementById('subjectsView').style.display = 'none';
                 document.getElementById('editView').style.display = 'block';
                 initEditView();
             } else if (view === 'invigilators') {
@@ -172,8 +200,28 @@
                 document.getElementById('generateFormView').style.display = 'none';
                 document.getElementById('allTablesView').style.display = 'none';
                 document.getElementById('editView').style.display = 'none';
+                document.getElementById('roomsView').style.display = 'none';
+                document.getElementById('subjectsView').style.display = 'none';
                 document.getElementById('invigilatorView').style.display = 'block';
                 initInvigilatorView();
+            } else if (view === 'rooms') {
+                document.getElementById('startView').style.display = 'none';
+                document.getElementById('generateFormView').style.display = 'none';
+                document.getElementById('allTablesView').style.display = 'none';
+                document.getElementById('editView').style.display = 'none';
+                document.getElementById('invigilatorView').style.display = 'none';
+                document.getElementById('subjectsView').style.display = 'none';
+                document.getElementById('roomsView').style.display = 'block';
+                initRoomsView();
+            } else if (view === 'subjects') {
+                document.getElementById('startView').style.display = 'none';
+                document.getElementById('generateFormView').style.display = 'none';
+                document.getElementById('allTablesView').style.display = 'none';
+                document.getElementById('editView').style.display = 'none';
+                document.getElementById('invigilatorView').style.display = 'none';
+                document.getElementById('roomsView').style.display = 'none';
+                document.getElementById('subjectsView').style.display = 'block';
+                initSubjectsView();
             }
         }
         

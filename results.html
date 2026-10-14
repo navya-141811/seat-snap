@@ -19,9 +19,79 @@
         <div class="download-buttons">
             <button onclick="saveData()" style="background: #28a745;">💾 Save Data</button>
             <button onclick="shuffleArrangement()" style="background: #6c757d;">🔀 Shuffle</button>
+            <button onclick="assignAllInvigilators()" id="assignInvigBtn" style="background: #7c3aed;">👩‍🏫 Assign Invigilators</button>
+            <button onclick="exportTablePDF()" style="background: #1d6f42;">📄 Export Table</button>
+            <button onclick="exportInvigilatorTablePDF()" style="background: #0e7490;">🧾 Export Invigilator Table</button>
         </div>
         
         <div id="tableContainer"></div>
+    </div>
+
+    <!-- Invigilator Replacement Modal -->
+    <div id="invigilatorReplaceModal"
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:14px;padding:28px;width:min(680px,96vw);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div>
+                    <h3 id="invigModalTitle" style="margin:0 0 4px;font-size:16px;color:#1a202c;">Replace Invigilator</h3>
+                    <p style="margin:0;color:#6b7280;font-size:13px;">Click a name to select. Blocked names teach a subject being examined in this room.</p>
+                </div>
+                <button onclick="closeInvigilatorReplaceModal()"
+                        style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;" aria-label="Close">✕</button>
+            </div>
+            <input id="invigModalSearch" type="search" placeholder="🔍 Search by name or department…"
+                   style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;margin-bottom:14px;outline:none;"
+                   onfocus="this.style.borderColor='#4a90e2'" onblur="this.style.borderColor='#e0e0e0'">
+            <div id="invigModalGrid"
+                 style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;overflow-y:auto;max-height:400px;padding-right:4px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Shortfall: Additional Invigilator Selection Modal -->
+    <div id="invigShortfallModal"
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:14px;padding:28px;width:min(760px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+                <div>
+                    <h3 style="margin:0 0 4px;font-size:16px;color:#1a202c;">⚠️ Invigilator Shortfall</h3>
+                    <p id="invigShortfallSubtitle" style="margin:0;color:#6b7280;font-size:13px;"></p>
+                </div>
+                <button onclick="closeInvigShortfallModal()"
+                        style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;" aria-label="Close">✕</button>
+            </div>
+
+            <!-- Rooms needing invigilators -->
+            <div id="invigShortfallRoomList"
+                 style="margin:12px 0 4px;padding:10px 14px;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;line-height:1.7;">
+            </div>
+
+            <!-- Search -->
+            <input id="invigShortfallSearch" type="search" placeholder="🔍 Search faculty by name or department…"
+                   style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;margin:12px 0 10px;outline:none;"
+                   onfocus="this.style.borderColor='#4a90e2'" onblur="this.style.borderColor='#e0e0e0'">
+
+            <!-- Faculty grid -->
+            <div id="invigShortfallGrid"
+                 style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;overflow-y:auto;flex:1;min-height:0;max-height:340px;padding-right:4px;">
+            </div>
+
+            <!-- Footer actions -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;">
+                <button onclick="removeAllInvigilators()"
+                        style="padding:9px 18px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                    🗑 Remove All Invigilator Assignments
+                </button>
+                <div style="display:flex;gap:10px;">
+                    <span id="invigShortfallSelCount" style="font-size:13px;color:#6b7280;align-self:center;"></span>
+                    <button onclick="confirmShortfallSelection()"
+                            style="padding:9px 22px;background:#7c3aed;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                        ✅ Confirm Selection
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="saveProgressOverlay" class="save-progress-overlay" role="dialog" aria-modal="true" aria-labelledby="saveProgressTitle" aria-describedby="saveProgressMessage" hidden>
